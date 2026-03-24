@@ -1,0 +1,22 @@
+.base {
+  display: block;
+  background-color: var(--skeleton-bg);
+  min-height: 1em;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+
+.base::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--skeleton-highlight),
+    transparent
+  );
+  transform: translateX(-100%);
+  animation: shimmer 2s infinite;
+}
