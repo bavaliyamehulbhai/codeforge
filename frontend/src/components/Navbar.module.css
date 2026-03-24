@@ -220,3 +220,34 @@
   .links { display: none; }
   .navInner { padding: 0 20px; }
 }
+
+.micBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border-bright);
+  background: hsla(240, 10%, 15%, 0.4);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.micBtn:hover {
+  background: hsla(240, 10%, 20%, 0.6);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.micActive {
+  color: #ef4444 !important;
+  border-color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.1) !important;
+  animation: pulse-red-glow 2s infinite;
+}
+
+.micIconActive {
+  animation: mic-pulse 1.5s infinite ease-in-out;
+}

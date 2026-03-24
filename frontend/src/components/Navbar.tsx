@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/lib/auth-context'
-import { Code2, LogOut, Code, Library, Globe } from 'lucide-react'
+import { Code2, LogOut, Code, Library, Globe, Mic, MicOff } from 'lucide-react'
+import { useGlobalCoderSpeak } from '@/lib/coder-speak-context'
+import Tooltip from '@/components/Tooltip'
+import VoiceWaveform from '@/components/VoiceWaveform'
 import styles from './Navbar.module.css'
 
 export default function Navbar() {
@@ -9,6 +12,7 @@ export default function Navbar() {
   const navigate = useNavigate()
   const location = useLocation()
   const [isScrolled, setIsScrolled] = useState(false)
+  const { isListening, toggleListening, isSupported } = useGlobalCoderSpeak()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -52,6 +56,20 @@ export default function Navbar() {
         </div>
 
         <div className={styles.auth}>
+          {isSupported && (
+            <Tooltip content={isListening ? "Stop Voice Control" : "Start Voice Control (CoderSpeak)"}>
+              <button 
+                onClick={toggleListening} 
+                className={`${styles.micBtn} ${isListening ? styles.micActive : ''}`}
+                title="Global Voice Control"
+              >
+                {isListening ? <Mic size={18} className={styles.micIconActive} /> : <MicOff size={18} />}
+              </button>
+            </Tooltip>
+          )}
+
+          <VoiceWaveform isActive={isListening} />
+
           {user ? (
             <div className={styles.userProfile}>
               <Link to="/settings" className={styles.userBtn}>

@@ -25,9 +25,11 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/codeforge
 // Routes
 const authRoutes = require('./routes/auth');
 const snippetRoutes = require('./routes/snippets');
+const voiceRoutes = require('./routes/voice');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/snippets', snippetRoutes);
+app.use('/api/voice', voiceRoutes);
 
 // Health Check
 app.get('/health', (req, res) => {

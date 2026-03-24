@@ -14,7 +14,8 @@ import {
   Globe, Cpu, Clock, Trash2, Copy, AlignLeft, ChevronDown,
   Maximize2, Minimize2, Code2, Sparkles, History,
   Headphones, BookTemplate, Settings as SettingsIcon,
-  Flame, Timer, MessageSquare, Send, Keyboard
+  Flame, Timer, MessageSquare, Send, Keyboard,
+  Mic, MicOff
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { useToast } from '@/lib/toast-context'
@@ -24,12 +25,14 @@ import { oneDark } from '@codemirror/theme-one-dark'
 import { LANGUAGES } from '@/lib/languages'
 import * as htmlToImage from 'html-to-image'
 import LanguagePicker from '@/components/LanguagePicker'
+import { useGlobalCoderSpeak } from '@/lib/coder-speak-context'
 import Tooltip from '@/components/Tooltip'
 import { formatCode } from '@/lib/formatter'
 import { EditorView } from '@codemirror/view'
 import { useFocusAudio } from '@/hooks/useFocusAudio'
 import { useAPMTracker } from '@/hooks/useAPMTracker'
 import { BOILERPLATES } from '@/lib/boilerplates'
+import VoiceWaveform from '@/components/VoiceWaveform'
 import styles from './Compiler.module.css'
 
 export default function Compiler() {
@@ -59,7 +62,11 @@ export default function Compiler() {
   const [showSettings, setShowSettings] = useState(false)
   const [showLibrary, setShowLibrary] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [showVoiceHelp, setShowVoiceHelp] = useState(false)
   const [wordWrap, setWordWrap] = useState(true)
+  const [lineNumbers, setLineNumbers] = useState(true)
+  const [showMinimap, setShowMinimap] = useState(true)
+  const [librarySearch, setLibrarySearch] = useState('')
   
   // Phase 4 Gamification State
   const apm = useAPMTracker()
@@ -70,6 +77,9 @@ export default function Compiler() {
     { sender: 'duck', text: "Quack! Tell me what's broken and I'll help you debug it." }
   ])
   const [chatInput, setChatInput] = useState('')
+
+  // CoderSpeak Functionality
+  const { isListening, toggleListening, isSupported, registerPageActions } = useGlobalCoderSpeak()
 
   // Pomodoro Effect
   useEffect(() => {
@@ -171,6 +181,30 @@ export default function Compiler() {
     }
   };
 
+  const resetEnvironment = () => {
+    setCode('');
+    setOutput(null);
+    updateFontSize(16);
+    updateTheme('one-dark');
+    setIsFocusMode(false);
+    setShowSettings(false);
+    setShowLibrary(false);
+    setShowShortcuts(false);
+    setShowVoiceHelp(false);
+    toast('Environment Reset Complete', 'info');
+  };
+
+  const handlePrepareCode = async () => {
+    toast('Executing Prepare Macro...', 'info');
+    handleFormat();
+    setTimeout(async () => {
+      await handleRun();
+      setTimeout(async () => {
+        await handleSave();
+      }, 2000);
+    }, 1000);
+  };
+
   const handleFormat = () => {
     const formatted = formatCode(code, language);
     if (formatted !== code) {
@@ -243,6 +277,8 @@ export default function Compiler() {
     setOutput(null)
     toast('Console cleared', 'info')
   }
+
+
 
   const handleForge = () => {
     setIsForging(true)
@@ -341,6 +377,155 @@ export default function Compiler() {
 
   const currentLang = LANGUAGES.find(l => l.value === language)
 
+  // Register Next-Level Voice Overrides (placed at bottom to access all handlers)
+  useEffect(() => {
+    return registerPageActions({
+      // Editor Actions
+      'run code': () => { handleRun(); return true; },
+      'clear console': () => { clearConsole(); return true; },
+      'format code': () => { handleFormat(); return true; },
+      'clear code': () => { setCode(''); return true; },
+      'delete all code': () => { setCode(''); return true; },
+      
+      // Languages
+      'switch to python': () => { setLanguage('python'); return true; },
+      'switch to javascript': () => { setLanguage('javascript'); return true; },
+      'switch to js': () => { setLanguage('javascript'); return true; },
+      'switch to rust': () => { setLanguage('rust'); return true; },
+      'switch to c++': () => { setLanguage('cpp'); return true; },
+      'switch to java': () => { setLanguage('java'); return true; },
+      'switch to go': () => { setLanguage('go'); return true; },
+      
+      // Advanced Tools
+      'optimize code': () => { handleForge(); return true; },
+      'take snapshot': () => { setShowSnapshotModal(true); return true; },
+      'capture image': () => { setShowSnapshotModal(true); return true; },
+      
+      // Environment Settings
+      'enter focus mode': () => { setIsFocusMode(true); return true; },
+      'exit focus mode': () => { setIsFocusMode(false); return true; },
+      'play music': () => { toggleFocusAudio(); return true; },
+      'stop music': () => { toggleFocusAudio(); return true; },
+      'play focus audio': () => { toggleFocusAudio(); return true; },
+      
+      // Neuro-Assistant
+      'open assistant': () => { setIsAssistantOpen(true); return true; },
+      'close assistant': () => { setIsAssistantOpen(false); return true; },
+      'ask duck': () => { setIsAssistantOpen(true); setActiveTab('duck'); return true; },
+      
+      // Top Controls
+      'save snippet': () => { handleSave(); return true; },
+      'share snippet': () => { handleShare(); return true; },
+      
+      // Modals & Panels
+      'open settings': () => { setShowSettings(true); return true; },
+      'close settings': () => { setShowSettings(false); return true; },
+      'open shortcuts': () => { setShowShortcuts(true); return true; },
+      'close shortcuts': () => { setShowShortcuts(false); return true; },
+      'open library': () => { setShowLibrary(true); return true; },
+      'close library': () => { setShowLibrary(false); return true; },
+      'show voice commands': () => { setShowVoiceHelp(true); return true; },
+      'help with voice': () => { setShowVoiceHelp(true); return true; },
+      'close help': () => { setShowVoiceHelp(false); return true; },
+
+      // Ultra-Premium Editor Controls
+      'increase font size': () => { 
+        updateFontSize(Math.min(fontSize + 2, 24)); 
+        toast('Increasing font size', 'info');
+        return true; 
+      },
+      'decrease font size': () => { 
+        updateFontSize(Math.max(fontSize - 2, 12)); 
+        toast('Decreasing font size', 'info');
+        return true; 
+      },
+      'set theme to one dark': () => { updateTheme('one-dark'); return true; },
+      'set theme to vscode dark': () => { updateTheme('vscode-dark'); return true; },
+      
+      // Template Injection
+      'insert express server': () => { 
+        const template = BOILERPLATES.javascript.find(b => b.name.includes('Express'));
+        if (template) { setCode(template.code); setLanguage('javascript'); toast('Injecting Express template', 'success'); }
+        return true; 
+      },
+      'insert react component': () => { 
+        const template = BOILERPLATES.javascript.find(b => b.name.includes('React'));
+        if (template) { setCode(template.code); setLanguage('javascript'); toast('Injecting React template', 'success'); }
+        return true; 
+      },
+      'insert binary search': () => { 
+        const template = BOILERPLATES.javascript.find(b => b.name.includes('Binary Search'));
+        if (template) { setCode(template.code); setLanguage('javascript'); toast('Injecting Binary Search template', 'success'); }
+        return true; 
+      },
+      
+      // Pomodoro
+      'start pomodoro': () => { setIsPomodoroActive(true); return true; },
+      'stop pomodoro': () => { setIsPomodoroActive(false); return true; },
+      
+      // History / Time Travel
+      'undo code': () => {
+        if (historyIndex > 0) {
+          const newIdx = historyIndex - 1;
+          setHistoryIndex(newIdx);
+          setCode(codeHistory[newIdx]);
+        }
+        return true;
+      },
+      'redo code': () => {
+        if (historyIndex < codeHistory.length - 1) {
+          const newIdx = historyIndex + 1;
+          setHistoryIndex(newIdx);
+          setCode(codeHistory[newIdx]);
+        }
+        return true;
+      },
+      
+      // Ultra-Powerful Macros
+      'prepare code': () => { handlePrepareCode(); return true; },
+      'ship it': () => { handlePrepareCode(); return true; },
+      'reset environment': () => { resetEnvironment(); return true; },
+      'reset all': () => { resetEnvironment(); return true; },
+
+      // Deep UI Toggles
+      'toggle word wrap': () => { setWordWrap(prev => !prev); return true; },
+      'toggle line numbers': () => { setLineNumbers(prev => !prev); return true; },
+      'toggle minimap': () => { setShowMinimap(prev => !prev); return true; },
+      'maximize editor': () => { setIsFocusMode(true); return true; },
+
+      // Vocal Search
+      'find in library': () => { setShowLibrary(true); return true; },
+      'search library for': (query?: string) => { 
+        setLibrarySearch(query || ''); 
+        setShowLibrary(true); 
+        return true; 
+      },
+
+      // AI-Driven Vocal Injection
+      'add try catch': () => {
+        const snippet = language === 'python' ? 'try:\n    \nexcept Exception as e:\n    pass' : 'try {\n    \n} catch (error) {\n    console.error(error);\n}';
+        setCode(prev => prev + '\n' + snippet);
+        toast('Injected Try-Catch', 'success');
+        return true;
+      },
+      'add console log': () => {
+        const snippet = language === 'python' ? 'print()' : 'console.log();';
+        setCode(prev => prev + '\n' + snippet);
+        toast('Injected Log', 'success');
+        return true;
+      },
+      
+    }, (transcribedCode) => {
+      setCode((prev) => prev + (prev.endsWith('\n') || prev === '' ? '' : '\n') + transcribedCode);
+    });
+  }, [
+    handleRun, clearConsole, handleFormat, setCode, registerPageActions,
+    setLanguage, handleForge, setShowSnapshotModal, setIsFocusMode,
+    updateFontSize, fontSize, updateTheme, setShowVoiceHelp,
+    setWordWrap, setLineNumbers, setShowMinimap, setLibrarySearch,
+    handlePrepareCode, resetEnvironment
+  ]);
+
   return (
     <div className={styles.container}>
       {/* Language Picker Overlay */}
@@ -422,9 +607,19 @@ export default function Compiler() {
             </Tooltip>
             {showLibrary && (
               <div className={styles.libraryDropdown}>
-                <div className={styles.libraryHeader}>Standard Library</div>
+                <div className={styles.libraryHeader}>
+                  <span>Standard Library</span>
+                  {librarySearch && (
+                    <div className={styles.activeFilter}>
+                      Filter: {librarySearch}
+                      <button onClick={() => setLibrarySearch('')}>×</button>
+                    </div>
+                  )}
+                </div>
                 {BOILERPLATES[language]?.length > 0 ? (
-                  BOILERPLATES[language].map((bp, idx) => (
+                  BOILERPLATES[language]
+                    .filter(bp => !librarySearch || bp.name.toLowerCase().includes(librarySearch.toLowerCase()))
+                    .map((bp, idx) => (
                     <button 
                       key={idx} 
                       className={styles.libraryItem}
@@ -480,6 +675,19 @@ export default function Compiler() {
           
           <div className={styles.divider} />
           
+          {isSupported && (
+            <Tooltip content={isListening ? "Stop CoderSpeak" : "CoderSpeak (Voice to Code)"}>
+              <button 
+                onClick={toggleListening} 
+                className={clsx(styles.miniBtn, isListening && styles.micActive)}
+              >
+                {isListening ? <Mic size={18} className={styles.micIconActive} /> : <MicOff size={18} />}
+              </button>
+            </Tooltip>
+          )}
+
+          <VoiceWaveform isActive={isListening} />
+
           <Tooltip content="Auto-Format Code">
             <button onClick={handleFormat} className={styles.miniBtn}>
               <AlignLeft size={18} />
@@ -520,9 +728,13 @@ export default function Compiler() {
             value={code}
             height="100%"
             theme={theme === 'one-dark' ? oneDark : vscodeDark}
-            extensions={[...getExtensions(), wordWrap ? EditorView.lineWrapping : []]}
+            extensions={[
+              ...getExtensions(), 
+              wordWrap ? EditorView.lineWrapping : [],
+              lineNumbers ? [] : [EditorView.theme({ ".cm-gutters": { display: "none" } })]
+            ]}
             onChange={(val) => setCode(val)}
-            className={styles.editor}
+            className={clsx(styles.editor, !showMinimap && styles.hideMinimap)}
             style={{ fontSize: `${fontSize}px` }}
           />
           {isRunning && (
@@ -869,6 +1081,45 @@ export default function Compiler() {
 
             <div className={styles.modalFooter}>
               <button onClick={() => setShowShortcuts(false)} className={styles.saveBtn}>Got it</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Voice Help Modal */}
+      {showVoiceHelp && (
+        <div className={styles.modalOverlay} onClick={() => setShowVoiceHelp(false)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Voice Command Reference</h2>
+              <button onClick={() => setShowVoiceHelp(false)} className={styles.closeBtn}>
+                <Trash2 size={20} />
+              </button>
+            </div>
+            <div className={styles.helpGrid}>
+              <div className={styles.helpSection}>
+                <h3>Global</h3>
+                <ul>
+                  <li>"Go Home" / "Go to Library"</li>
+                  <li>"Scroll Down" / "Scroll Up"</li>
+                  <li>"Sign Out"</li>
+                </ul>
+              </div>
+              <div className={styles.helpSection}>
+                <h3>Editor</h3>
+                <ul>
+                  <li>"Run Code" / "Format Code"</li>
+                  <li>"Clear Console" / "Optimize Code"</li>
+                  <li>"Insert [Template]"</li>
+                </ul>
+              </div>
+              <div className={styles.helpSection}>
+                <h3>Features</h3>
+                <ul>
+                  <li>"Take Snapshot" / "Open Assistant"</li>
+                  <li>"Start Pomodoro"</li>
+                  <li>"Undo Code" / "Redo Code"</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>

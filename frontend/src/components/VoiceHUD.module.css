@@ -1,0 +1,116 @@
+.hud {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  z-index: 9999;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+}
+
+.hud.active {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.container {
+  background: hsla(240, 10%, 4%, 0.85);
+  backdrop-filter: blur(24px) saturate(200%);
+  border: 1px solid hsla(0, 0%, 100%, 0.1);
+  padding: 12px 24px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  box-shadow: 
+    0 20px 40px -10px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 0 hsla(0, 0%, 100%, 0.05);
+}
+
+.statusGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.indicator.listening {
+  background: #3b82f6;
+  box-shadow: 0 0 10px #3b82f6;
+  animation: pulse-blue 1.5s infinite;
+}
+
+.indicator.processing {
+  background: #f59e0b;
+  box-shadow: 0 0 10px #f59e0b;
+}
+
+.indicator.success {
+  background: #10b981;
+  box-shadow: 0 0 10px #10b981;
+}
+
+.statusText {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  min-width: 80px;
+}
+
+.commandFeedback {
+  padding-left: 20px;
+  border-left: 1px solid hsla(0, 0%, 100%, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: slide-in 0.3s ease-out;
+}
+
+.commandLabel {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.commandValue {
+  color: var(--accent);
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.interimContainer {
+  padding-left: 20px;
+  border-left: 1px solid hsla(0, 0%, 100%, 0.1);
+  display: flex;
+  align-items: center;
+  max-width: 300px;
+  overflow: hidden;
+}
+
+.interimText {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-style: italic;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  opacity: 0.7;
+}
+
+@keyframes pulse-blue {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.6; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes slide-in {
+  from { transform: translateX(10px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}

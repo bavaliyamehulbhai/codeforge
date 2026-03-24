@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './lib/auth-context'
 import { ToastProvider } from './lib/toast-context'
+import { CoderSpeakProvider } from './lib/coder-speak-context'
 import Navbar from './components/Navbar'
 import Home from './pages/Home'
 import Compiler from './pages/Compiler'
@@ -17,22 +18,24 @@ function App() {
     <ToastProvider>
       <AuthProvider>
         <Router>
-          <div className="app-container">
-            <div className="grid-overlay" />
-            <Navbar />
-            <main className="content">
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/compiler" element={<Compiler />} />
-                <Route path="/snippets" element={<Snippets />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/share/:id" element={<ShareView />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/gallery" element={<Gallery />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </main>
-          </div>
+          <CoderSpeakProvider>
+            <div className="app-container">
+              <div className="grid-overlay" />
+              <Navbar />
+              <main className="content">
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/compiler" element={<Compiler />} />
+                  <Route path="/snippets" element={<Snippets />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/share/:id" element={<ShareView />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/gallery" element={<Gallery />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </main>
+            </div>
+          </CoderSpeakProvider>
         </Router>
       </AuthProvider>
     </ToastProvider>
