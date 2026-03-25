@@ -65,20 +65,41 @@
   box-shadow: 0 0 20px var(--accent-dim);
 }
 
+.filters {
+  display: flex;
+  gap: 12px;
+}
+
 .filterSelect {
-  padding: 12px 20px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-bright);
+  padding: 10px 16px;
+  background: hsla(0, 0%, 100%, 0.05);
+  border: 1px solid hsla(0, 0%, 100%, 0.1);
   border-radius: 12px;
-  color: var(--text-primary);
-  font-weight: 700;
+  color: var(--text-secondary);
+  font-weight: 600;
   cursor: pointer;
-  outline: none;
   transition: all var(--transition-fast);
 }
 
 .filterSelect:hover {
+  background: hsla(0, 0%, 100%, 0.1);
   border-color: var(--accent);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.tag {
+  font-size: 11px;
+  color: var(--accent);
+  background: hsla(240, 100%, 65%, 0.1);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: 600;
 }
 
 .grid {

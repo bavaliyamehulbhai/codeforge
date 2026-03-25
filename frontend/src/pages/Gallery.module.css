@@ -140,21 +140,36 @@
 }
 
 .title {
-  font-size: 20px;
-  font-weight: 800;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 8px;
   color: var(--text-primary);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-bottom: 12px;
 }
 
+.tag {
+  font-size: 10px;
+  color: var(--accent);
+  background: hsla(240, 100%, 65%, 0.1);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
 .preview {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 20px;
   font-family: var(--font-mono);
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.6;
-  opacity: 0.8;
   display: -webkit-box;
   -webkit-line-clamp: 3;
-  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }

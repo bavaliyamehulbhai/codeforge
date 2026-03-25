@@ -1,14 +1,27 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { executeCode } from '@/lib/judge0'
-import { ExecutionResult } from '@/types'
+import { ExecutionResult, User } from '@/types'
 
-export function useCompiler() {
+export function useCompiler(user: User | null = null) {
   const [code, setCode] = useState('// Write your code here...')
   const [language, setLanguage] = useState('javascript')
   const [output, setOutput] = useState<ExecutionResult | null>(null)
   const [isRunning, setIsRunning] = useState(false)
-  const [fontSize, setFontSize] = useState(() => Number(localStorage.getItem('codeforge_fontsize')) || 14)
-  const [theme, setTheme] = useState(() => localStorage.getItem('codeforge_theme') || 'vscode-dark')
+  const [fontSize, setFontSize] = useState(14)
+  const [theme, setTheme] = useState('vs-dark')
+
+  // Initialize from user preferences or localStorage
+  useEffect(() => {
+    if (user?.preferences) {
+      setFontSize(user.preferences.fontSize)
+      setTheme(user.preferences.theme)
+    } else {
+      const savedSize = localStorage.getItem('codeforge_fontsize')
+      const savedTheme = localStorage.getItem('codeforge_theme')
+      if (savedSize) setFontSize(Number(savedSize))
+      if (savedTheme) setTheme(savedTheme)
+    }
+  }, [user])
 
   const runCode = async (languageId: number) => {
     setIsRunning(true)

@@ -75,8 +75,7 @@ router.patch('/profile', async (req, res) => {
     if (!token) return res.status(401).json({ error: 'Authentication required' });
 
     const decoded = jwt.verify(token, JWT_SECRET);
-    const { username, email, password, avatar_url } = req.body;
-
+    const { username, email, password, avatar_url, bio, website, social_links, preferences } = req.body;
     const user = await User.findById(decoded.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
@@ -84,11 +83,36 @@ router.patch('/profile', async (req, res) => {
     if (email) user.email = email;
     if (password) user.password = password;
     if (avatar_url !== undefined) user.avatar_url = avatar_url;
+    if (bio !== undefined) user.bio = bio;
+    if (website !== undefined) user.website = website;
+    if (social_links) user.social_links = { ...user.social_links.toObject(), ...social_links };
+    if (preferences) user.preferences = { ...user.preferences.toObject(), ...preferences };
 
     await user.save();
     res.json({ user: user.toPublic() });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// Get Public Profile
+router.get('/profile/:username', async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.params.username.toLowerCase() });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Fetch public snippets for this user
+    const Snippet = require('../models/Snippet'); // Lazy load to avoid circular dependency
+    const snippets = await Snippet.find({ user_id: user._id, is_public: true })
+      .sort({ created_at: -1 })
+      .limit(20);
+
+    res.json({
+      user: user.toPublic(),
+      snippets
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

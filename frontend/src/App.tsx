@@ -8,8 +8,10 @@ import Compiler from './pages/Compiler'
 import Snippets from './pages/Snippets'
 import Auth from './pages/Auth'
 import ShareView from './pages/ShareView'
+import Dashboard from './pages/Dashboard'
 import Settings from './pages/Settings'
 import Gallery from './pages/Gallery'
+import PublicProfile from './pages/PublicProfile'
 import NotFound from './pages/NotFound'
 import './styles/globals.css'
 
@@ -30,6 +32,8 @@ function App() {
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/share/:id" element={<ShareView />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/u/:username" element={<PublicProfile />} />
                   <Route path="/gallery" element={<Gallery />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>

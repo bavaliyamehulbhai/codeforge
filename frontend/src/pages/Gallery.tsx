@@ -34,7 +34,8 @@ export default function Gallery() {
   }, [])
 
   const filteredSnippets = snippets.filter(s => {
-    const matchesSearch = s.title.toLowerCase().includes(search.toLowerCase())
+    const matchesSearch = s.title.toLowerCase().includes(search.toLowerCase()) || 
+                         (s.tags || []).some(t => t.toLowerCase().includes(search.toLowerCase()))
     const matchesLang = language === 'all' || s.language === language
     return matchesSearch && matchesLang
   })
@@ -88,6 +89,11 @@ export default function Gallery() {
                 <span className={styles.owner}>@{s.user_id.substring(0, 8)}</span>
               </div>
               <h3 className={styles.title}>{s.title}</h3>
+              <div className={styles.tags}>
+                {(s.tags || []).map(t => (
+                  <span key={t} className={styles.tag}>#{t}</span>
+                ))}
+              </div>
               <p className={styles.preview}>
                 {s.code.substring(0, 100)}...
               </p>
@@ -100,7 +106,7 @@ export default function Gallery() {
                   })}
                   className={styles.likeBtn}
                 >
-                  <Heart size={14} className={s.likes > 0 ? styles.activeHeart : ''} />
+                  <Heart size={14} className={s.likes > 0 ? styles.activeHeart : ''} fill={s.likes > 0 ? "currentColor" : "none"} />
                   <span>{s.likes}</span>
                 </button>
                 <Link to={`/share/${s.id}`} className={styles.viewBtn}>

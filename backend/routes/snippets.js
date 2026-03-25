@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const Snippet = require('../models/Snippet');
+const { checkAndAwardAchievements } = require('../utils/achievements');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'codeforge_super_secret_key_change_me';
 
@@ -22,14 +23,20 @@ const protect = (req, res, next) => {
 // Get User Snippets (with search and filter)
 router.get('/', protect, async (req, res) => {
   try {
-    const { search, language } = req.query;
+    const { search, language, tag } = req.query;
     let query = { user_id: req.userId };
 
     if (search) {
-      query.title = { $regex: search, $options: 'i' };
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { tags: { $in: [new RegExp(search, 'i')] } }
+      ];
     }
     if (language && language !== 'all') {
       query.language = language;
+    }
+    if (tag) {
+      query.tags = tag.toLowerCase();
     }
 
     const snippets = await Snippet.find(query).sort({ created_at: -1 });
@@ -69,16 +76,38 @@ router.get('/:id', async (req, res) => {
 // Save Snippet
 router.post('/', protect, async (req, res) => {
   try {
-    const { title, language, code, is_public } = req.body;
+    const { title, language, code, is_public, tags } = req.body;
     const snippet = new Snippet({
       user_id: req.userId,
       title,
       language,
       code,
       is_public: is_public ?? false,
+      tags: tags || [],
     });
     await snippet.save();
+    await checkAndAwardAchievements(req.userId);
     res.status(201).json(snippet.toPublic());
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Update Snippet
+router.patch('/:id', protect, async (req, res) => {
+  try {
+    const { title, language, code, is_public, tags } = req.body;
+    const snippet = await Snippet.findOne({ _id: req.params.id, user_id: req.userId });
+    if (!snippet) return res.status(404).json({ error: 'Snippet not found' });
+
+    if (title) snippet.title = title;
+    if (language) snippet.language = language;
+    if (code) snippet.code = code;
+    if (is_public !== undefined) snippet.is_public = is_public;
+    if (tags) snippet.tags = tags;
+
+    await snippet.save();
+    res.json(snippet.toPublic());
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -121,6 +150,8 @@ router.post('/:id/like', protect, async (req, res) => {
     }
 
     await snippet.save();
+    // Award achievement to the snippet owner
+    await checkAndAwardAchievements(snippet.user_id);
     res.json({ likes: snippet.likes.length, isLiked: (likeIndex === -1) });
   } catch (err) {
     res.status(500).json({ error: 'Failed to toggle like' });

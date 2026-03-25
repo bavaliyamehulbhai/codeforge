@@ -38,13 +38,15 @@ import styles from './Compiler.module.css'
 export default function Compiler() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const { saveSnippet } = useSnippets()
+  const { saveSnippet, updateSnippet } = useSnippets()
   const { 
     code, setCode, language, setLanguage, output, isRunning, runCode,
     fontSize, updateFontSize, theme, updateTheme, setOutput 
-  } = useCompiler()
+  } = useCompiler(user)
   const location = useLocation()
   const [title, setTitle] = useState('Untitled Snippet')
+  const [tags, setTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState('')
   const [snippetId, setSnippetId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   // Show language picker unless user arrived from a saved snippet
@@ -220,6 +222,7 @@ export default function Compiler() {
       setLanguage(snippet.language)
       setTitle(snippet.title || 'Untitled Snippet')
       setSnippetId(snippet.id)
+      setTags(snippet.tags || [])
       setHasPickedLanguage(true) // Skip picker for loaded snippets
     }
   }, [location.state, setCode, setLanguage])
@@ -249,16 +252,39 @@ export default function Compiler() {
     if (!user) return toast('Please sign in to save snippets', 'error')
     setIsSaving(true)
     try {
-      const savedSnippet = await saveSnippet({ title, language, code, is_public: true })
-      if (savedSnippet) {
-        setSnippetId(savedSnippet.id)
-        toast('Snippet saved to cloud!', 'success')
+      const snippetData = { title, language, code, is_public: true, tags }
+      let result;
+      
+      if (snippetId) {
+        result = await updateSnippet(snippetId, snippetData)
+        if (result) toast('Snippet updated!', 'success')
+      } else {
+        result = await saveSnippet(snippetData)
+        if (result) {
+          setSnippetId(result.id)
+          toast('Snippet saved to cloud!', 'success')
+        }
       }
     } catch (err) {
       toast('Failed to save snippet', 'error')
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const handleAddTag = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && tagInput.trim()) {
+      e.preventDefault()
+      const newTag = tagInput.trim().toLowerCase()
+      if (!tags.includes(newTag)) {
+        setTags([...tags, newTag])
+      }
+      setTagInput('')
+    }
+  }
+
+  const removeTag = (tagToRemove: string) => {
+    setTags(tags.filter(t => t !== tagToRemove))
   }
 
   const handleShare = () => {
@@ -551,9 +577,24 @@ export default function Compiler() {
               value={title} 
               onChange={(e) => setTitle(e.target.value)} 
               className={styles.titleInput}
-              placeholder="Enter snippet title..."
+              placeholder="Untitled Snippet"
             />
-            <span className={styles.titleUnderline} />
+            <div className={styles.tagsArea}>
+              {tags.map(tag => (
+                <span key={tag} className={styles.tag}>
+                  #{tag}
+                  <button onClick={() => removeTag(tag)} className={styles.removeTag}>×</button>
+                </span>
+              ))}
+              <input
+                type="text"
+                value={tagInput}
+                onChange={e => setTagInput(e.target.value)}
+                onKeyDown={handleAddTag}
+                placeholder="Add tag..."
+                className={styles.tagInput}
+              />
+            </div>
           </div>
           <div className={styles.controls}>
             {/* Language selector — shows icon + name */}
@@ -675,7 +716,7 @@ export default function Compiler() {
           
           <div className={styles.divider} />
           
-          {isSupported && (
+          {isSupported && user && (
             <Tooltip content={isListening ? "Stop CoderSpeak" : "CoderSpeak (Voice to Code)"}>
               <button 
                 onClick={toggleListening} 

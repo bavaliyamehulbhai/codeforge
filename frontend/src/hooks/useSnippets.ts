@@ -15,7 +15,7 @@ export function useSnippets() {
     return { Authorization: `Bearer ${token}` }
   }
 
-  const fetchSnippets = useCallback(async (params?: { search?: string, language?: string }) => {
+  const fetchSnippets = useCallback(async (params?: { search?: string, language?: string, tag?: string }) => {
     if (!user) { setSnippets([]); return }
     setLoading(true)
     
@@ -51,6 +51,7 @@ export function useSnippets() {
     language: string
     code: string
     is_public?: boolean
+    tags?: string[]
   }): Promise<Snippet | null> => {
     if (!user) return null
 
@@ -60,8 +61,10 @@ export function useSnippets() {
       id: tempId,
       ...data,
       is_public: data.is_public ?? false,
+      tags: data.tags ?? [],
       user_id: user.id,
       created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       run_count: 0,
       likes: 0
     }
@@ -79,6 +82,19 @@ export function useSnippets() {
       console.error('Error saving snippet:', err)
       // Rollback
       setSnippets(prev => prev.filter(s => s.id !== tempId))
+      return null
+    }
+  }
+
+  const updateSnippet = async (id: string, data: Partial<Snippet>): Promise<Snippet | null> => {
+    try {
+      const { data: updatedSnippet } = await axios.patch(`${API_URL}/snippets/${id}`, data, {
+        headers: getHeaders()
+      })
+      setSnippets(prev => prev.map(s => s.id === id ? updatedSnippet : s))
+      return updatedSnippet
+    } catch (err) {
+      console.error('Error updating snippet:', err)
       return null
     }
   }
@@ -126,6 +142,7 @@ export function useSnippets() {
     snippets, 
     loading, 
     saveSnippet, 
+    updateSnippet,
     deleteSnippet, 
     fetchSnippets, 
     fetchSnippetById, 

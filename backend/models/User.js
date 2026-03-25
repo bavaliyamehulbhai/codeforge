@@ -30,6 +30,40 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  bio: {
+    type: String,
+    maxlength: [200, 'Bio cannot exceed 200 characters'],
+    default: '',
+  },
+  website: {
+    type: String,
+    default: '',
+  },
+  social_links: {
+    github: { type: String, default: '' },
+    twitter: { type: String, default: '' },
+    linkedin: { type: String, default: '' },
+  },
+  preferences: {
+    theme: { type: String, default: 'vs-dark' },
+    fontSize: { type: Number, default: 14 },
+    autoSave: { type: Boolean, default: true },
+    tabSize: { type: Number, default: 2 },
+  },
+  last_active: {
+    type: Date,
+    default: Date.now,
+  },
+  streak_count: {
+    type: Number,
+    default: 0,
+  },
+  achievements: [{
+    id: String,
+    name: String,
+    icon: String,
+    earned_at: { type: Date, default: Date.now },
+  }],
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
 })
@@ -53,6 +87,13 @@ userSchema.methods.toPublic = function () {
     email: this.email,
     username: this.username,
     avatar_url: this.avatar_url,
+    bio: this.bio,
+    website: this.website,
+    social_links: this.social_links,
+    preferences: this.preferences,
+    streak_count: this.streak_count,
+    achievements: this.achievements || [],
+    last_active: this.last_active ? this.last_active.toISOString() : null,
     created_at: this.created_at.toISOString(),
   }
 }

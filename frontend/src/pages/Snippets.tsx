@@ -11,13 +11,17 @@ export default function Snippets() {
   const { snippets, loading, deleteSnippet, fetchSnippets, toggleLike } = useSnippets()
   const [search, setSearch] = useState('')
   const [language, setLanguage] = useState('all')
+  const [tag, setTag] = useState('all')
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchSnippets({ search, language })
+      fetchSnippets({ search, language: language === 'all' ? undefined : language, tag: tag === 'all' ? undefined : tag })
     }, 300)
     return () => clearTimeout(timer)
-  }, [search, language, fetchSnippets])
+  }, [search, language, tag, fetchSnippets])
+
+  // Get unique tags for the filter
+  const allTags = Array.from(new Set(snippets.flatMap(s => s.tags || []))).sort()
 
   if (!user) return <div className={styles.empty}>Please sign in to view your snippets.</div>
 
@@ -33,21 +37,34 @@ export default function Snippets() {
           <Search className={styles.searchIcon} size={18} />
           <input 
             type="text" 
-            placeholder="Search by title..." 
+            placeholder="Search title or tags..." 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <select 
-          className={styles.filterSelect}
-          value={language}
-          onChange={(e) => setLanguage(e.target.value)}
-        >
-          <option value="all">All Languages</option>
-          {LANGUAGES.map(l => (
-            <option key={l.id} value={l.id}>{l.name}</option>
-          ))}
-        </select>
+        <div className={styles.filters}>
+          <select 
+            className={styles.filterSelect}
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+          >
+            <option value="all">All Languages</option>
+            {LANGUAGES.map(l => (
+              <option key={l.id} value={l.id}>{l.name}</option>
+            ))}
+          </select>
+
+          <select 
+            className={styles.filterSelect}
+            value={tag}
+            onChange={(e) => setTag(e.target.value)}
+          >
+            <option value="all">All Tags</option>
+            {allTags.map(t => (
+              <option key={t} value={t}>#{t}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {loading ? (
@@ -55,9 +72,8 @@ export default function Snippets() {
       ) : snippets.length === 0 ? (
         <div className={styles.emptyState}>
           <Code2 size={48} />
-          <h3>No snippets yet</h3>
-          <p>Start coding and save your first project to see it here.</p>
-          <Link to="/compiler" className={styles.createBtn}>Create First Snippet</Link>
+          <h3>No snippets found</h3>
+          <p>Try adjusting your search or filters.</p>
         </div>
       ) : (
         <div className={styles.grid}>
@@ -84,6 +100,11 @@ export default function Snippets() {
                 </div>
               </div>
               <h3 className={styles.snippetTitle}>{snippet.title}</h3>
+              <div className={styles.tags}>
+                {(snippet.tags || []).map(t => (
+                  <span key={t} className={styles.tag}>#{t}</span>
+                ))}
+              </div>
               <div className={styles.cardFooter}>
                 <div className={styles.stats}>
                   <button 
@@ -91,7 +112,11 @@ export default function Snippets() {
                     className={styles.stat}
                     title="Likes"
                   >
-                    <Heart size={13} className={snippet.likes > 0 ? styles.liked : ''} />
+                    <Heart 
+                      size={13} 
+                      className={snippet.likes > 0 ? styles.liked : ''} 
+                      fill={snippet.likes > 0 ? "currentColor" : "none"} 
+                    />
                     <span>{snippet.likes}</span>
                   </button>
                   <div className={styles.stat} title="Executions">

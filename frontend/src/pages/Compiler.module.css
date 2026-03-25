@@ -9,18 +9,18 @@
 
 /* ───── HEADER ───── */
 .header {
-  height: 60px;
-  background: hsla(240, 10%, 6%, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  padding: 0 24px;
+  height: 64px;
+  background: hsla(240, 10%, 4%, 0.9);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  padding: 0 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  z-index: 20;
-  gap: 16px;
+  z-index: 100;
+  gap: 20px;
   position: relative;
-  border-bottom: 1px solid var(--border-bright);
+  border-bottom: 1px solid hsla(0, 0%, 100%, 0.05);
 }
 
 .logo {
@@ -76,44 +76,58 @@
 }
 
 .titleWrapper {
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   flex: 1;
-  max-width: 320px;
+  min-width: 0;
+  gap: 2px;
 }
 
 .titleInput {
-  width: 100%;
   background: transparent;
   border: none;
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-primary);
-  padding: 10px 0;
+  padding: 0;
   outline: none;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
+  max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.titleUnderline {
-  position: absolute;
-  bottom: 0px;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background: var(--accent-dim);
-  border-radius: 2px;
-  transform: scaleX(0.12);
-  transform-origin: left;
-  transition: all var(--transition);
+.tagsArea {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
-.titleInput:focus + .titleUnderline {
-  transform: scaleX(1);
-  background: var(--accent);
-  box-shadow: 0 0 15px var(--accent-glow);
+.tagsArea::-webkit-scrollbar {
+  display: none;
+}
+
+.tagInput {
+  background: hsla(0, 0%, 100%, 0.03);
+  border: 1px dashed hsla(0, 0%, 100%, 0.1);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+  width: 70px;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.tagInput:focus {
+  border-style: solid;
+  border-color: var(--accent);
+  background: hsla(0, 0%, 100%, 0.05);
+  width: 100px;
 }
 
 .titleInput:focus + .saveBtn:active {
@@ -1155,6 +1169,30 @@ input:checked + .slider:before {
 @keyframes scale-up {
   from { transform: scale(0.95); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
+}
+
+.mod.tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: hsla(240, 100%, 65%, 0.1);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: var(--accent);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.removeTag {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
 }
 
 .modalHeader {

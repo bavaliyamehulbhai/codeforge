@@ -36,6 +36,11 @@ const snippetSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  tags: [{
+    type: String,
+    trim: true,
+    lowercase: true,
+  }],
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
 })
@@ -51,6 +56,7 @@ snippetSchema.methods.toPublic = function () {
     is_public: this.is_public,
     likes: this.likes.length,
     run_count: this.run_count,
+    tags: this.tags || [],
     created_at: this.created_at.toISOString(),
     updated_at: this.updated_at.toISOString(),
   }

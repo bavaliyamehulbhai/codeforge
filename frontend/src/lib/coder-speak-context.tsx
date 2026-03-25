@@ -67,7 +67,7 @@ export function CoderSpeakProvider({ children }: { children: ReactNode }) {
   const onDictationRef = useRef<((text: string) => void) | null>(null);
 
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -124,11 +124,15 @@ export function CoderSpeakProvider({ children }: { children: ReactNode }) {
       if (transcript.includes('go home')) navigate('/');
       else if (transcript.includes('go to compiler')) navigate('/compiler');
       else if (transcript.includes('go to snippets')) navigate('/snippets');
-      else if (transcript.includes('sign out')) { signOut(); navigate('/'); }
+      else if (transcript.includes('go to dashboard')) navigate('/dashboard');
+      else if (transcript.includes('open settings')) navigate('/settings');
+      else if (transcript.includes('view my portfolio')) navigate(`/u/${user?.username}`);
+      else if (transcript.includes('view my profile')) navigate(`/u/${user?.username}`);
+      else if (transcript.includes('sign out') || transcript.includes('log out')) { signOut(); navigate('/'); }
       else if (onDictationRef.current) onDictationRef.current(transcript);
     }
     return handledLocally;
-  }, [navigate, signOut, toast]);
+  }, [navigate, signOut, toast, user]);
 
   useEffect(() => {
     if (!recognition) return;
@@ -256,8 +260,12 @@ export function CoderSpeakProvider({ children }: { children: ReactNode }) {
   };
 
   const startListening = useCallback(() => {
+    if (!user) {
+      toast('Please sign in to use voice control', 'error');
+      return;
+    }
     startDeepgram();
-  }, [recognition]);
+  }, [user]);
 
   const stopListening = useCallback(() => {
     if (socketRef.current) {
@@ -271,9 +279,13 @@ export function CoderSpeakProvider({ children }: { children: ReactNode }) {
   }, [recognition]);
 
   const toggleListening = useCallback(() => {
+    if (!user) {
+      toast('Please sign in to use voice control', 'error');
+      return;
+    }
     if (isListening) stopListening();
     else startListening();
-  }, [isListening, startListening, stopListening]);
+  }, [isListening, startListening, stopListening, user]);
 
   const registerPageActions = useCallback((commands: CommandHandler, onDictate?: (text: string) => void) => {
     pageCommandsRef.current = commands;

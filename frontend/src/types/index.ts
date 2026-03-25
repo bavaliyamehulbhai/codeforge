@@ -4,7 +4,32 @@ export interface User {
   id: string
   email: string
   username: string
+  avatar_url?: string | null
+  bio: string
+  website: string
+  social_links: {
+    github: string
+    twitter: string
+    linkedin: string
+  }
+  preferences: {
+    theme: string
+    fontSize: number
+    autoSave: boolean
+    tabSize: number
+    voiceEnabled: boolean
+  }
+  streak_count: number
+  achievements: Achievement[]
+  last_active: string | null
   created_at: string
+}
+
+export interface Achievement {
+  id: string
+  name: string
+  icon: string
+  earned_at: string
 }
 
 export interface Snippet {
@@ -16,7 +41,9 @@ export interface Snippet {
   is_public: boolean
   likes: number
   run_count: number
+  tags: string[]
   created_at: string
+  updated_at: string
 }
 
 export interface ExecutionResult {

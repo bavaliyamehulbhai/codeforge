@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/lib/auth-context'
-import { Code2, LogOut, Code, Library, Globe, Mic, MicOff } from 'lucide-react'
+import { Code2, LogOut, Code, Library, Globe, Mic, MicOff, LayoutDashboard } from 'lucide-react'
 import { useGlobalCoderSpeak } from '@/lib/coder-speak-context'
 import Tooltip from '@/components/Tooltip'
 import VoiceWaveform from '@/components/VoiceWaveform'
@@ -41,13 +41,21 @@ export default function Navbar() {
         </Link>
 
         <div className={styles.links}>
+          {user && (
+            <>
+              <Link to="/dashboard" className={styles.link}>
+                <LayoutDashboard size={18} />
+                <span>Dashboard</span>
+              </Link>
+              <Link to="/snippets" className={styles.link}>
+                <Library size={18} />
+                <span>My Snippets</span>
+              </Link>
+            </>
+          )}
           <Link to="/compiler" className={styles.link}>
             <Code size={18} />
             <span>Compiler</span>
-          </Link>
-          <Link to="/snippets" className={styles.link}>
-            <Library size={18} />
-            <span>My Snippets</span>
           </Link>
           <Link to="/gallery" className={styles.link}>
             <Globe size={18} />
@@ -56,7 +64,7 @@ export default function Navbar() {
         </div>
 
         <div className={styles.auth}>
-          {isSupported && (
+          {isSupported && user && (
             <Tooltip content={isListening ? "Stop Voice Control" : "Start Voice Control (CoderSpeak)"}>
               <button 
                 onClick={toggleListening} 
@@ -73,8 +81,14 @@ export default function Navbar() {
           {user ? (
             <div className={styles.userProfile}>
               <Link to="/settings" className={styles.userBtn}>
+                <div className={styles.userAvatar}>
+                  {user.avatar_url ? (
+                    <img src={user.avatar_url} alt={user.username} />
+                  ) : (
+                    <div className={styles.avatarInitial}>{user.username[0].toUpperCase()}</div>
+                  )}
+                </div>
                 <span className={styles.username}>{user.username}</span>
-                <Code size={14} className={styles.settingsIcon} />
               </Link>
               <button onClick={handleSignOut} className={styles.signOutBtn} title="Sign Out">
                 <LogOut size={18} />
