@@ -133,6 +133,25 @@
   transition: all var(--transition-fast);
 }
 
+.planPill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: hsla(140, 70%, 35%, 0.2);
+  border: 1px solid hsla(140, 70%, 45%, 0.4);
+  color: #bbf7d0;
+  text-decoration: none;
+}
+
+.planPillWarning {
+  background: hsla(0, 70%, 45%, 0.2);
+  border-color: hsla(0, 70%, 45%, 0.45);
+  color: #fecaca;
+}
+
 .userProfile:hover {
   border-color: var(--accent);
   background: hsla(240, 10%, 20%, 0.6);
@@ -239,6 +258,18 @@
   background: hsla(240, 10%, 20%, 0.6);
   color: var(--text-primary);
   border-color: var(--accent);
+}
+
+.micDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: var(--border);
+}
+
+.micDisabled:hover {
+  background: hsla(240, 10%, 15%, 0.4);
+  color: var(--text-muted);
+  border-color: var(--border);
 }
 
 .micActive {

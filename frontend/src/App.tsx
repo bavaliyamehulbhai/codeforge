@@ -12,6 +12,7 @@ import Dashboard from './pages/Dashboard'
 import Settings from './pages/Settings'
 import Gallery from './pages/Gallery'
 import PublicProfile from './pages/PublicProfile'
+import JoinCollaboration from './pages/JoinCollaboration'
 import NotFound from './pages/NotFound'
 import './styles/globals.css'
 
@@ -28,6 +29,7 @@ function App() {
                 <Routes>
                   <Route path="/" element={<Home />} />
                   <Route path="/compiler" element={<Compiler />} />
+                  <Route path="/collaborate" element={<JoinCollaboration />} />
                   <Route path="/snippets" element={<Snippets />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/share/:id" element={<ShareView />} />

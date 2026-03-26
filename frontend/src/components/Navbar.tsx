@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/lib/auth-context'
-import { Code2, LogOut, Code, Library, Globe, Mic, MicOff, LayoutDashboard } from 'lucide-react'
+import { Code2, LogOut, Code, Library, Globe, Mic, MicOff, LayoutDashboard, Users } from 'lucide-react'
 import { useGlobalCoderSpeak } from '@/lib/coder-speak-context'
 import Tooltip from '@/components/Tooltip'
 import VoiceWaveform from '@/components/VoiceWaveform'
@@ -13,6 +13,20 @@ export default function Navbar() {
   const location = useLocation()
   const [isScrolled, setIsScrolled] = useState(false)
   const { isListening, toggleListening, isSupported } = useGlobalCoderSpeak()
+  const voiceEnabled = user?.preferences?.voiceEnabled ?? true
+  const billingStatus = user?.subscription?.cancel_at_period_end ? 'canceling' : user?.plan && user.plan !== 'free' ? 'active' : null
+  const billingLabel = billingStatus === 'canceling' ? 'Ending Soon' : billingStatus === 'active' ? user?.plan?.toUpperCase() : null
+  const formatDate = (value: string | null | undefined) => {
+    if (!value) return 'N/A'
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return 'N/A'
+    return parsed.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  }
+  const billingTooltip = billingStatus === 'canceling'
+    ? `Cancellation scheduled for ${formatDate(user?.subscription?.current_period_end)}`
+    : billingStatus === 'active'
+      ? `Renews on ${formatDate(user?.subscription?.current_period_end)}`
+      : ''
 
   useEffect(() => {
     const handleScroll = () => {
@@ -61,14 +75,25 @@ export default function Navbar() {
             <Globe size={18} />
             <span>Gallery</span>
           </Link>
+          <Link to="/collaborate" className={styles.link}>
+            <Users size={18} />
+            <span>Join Fusion</span>
+          </Link>
         </div>
 
         <div className={styles.auth}>
           {isSupported && user && (
-            <Tooltip content={isListening ? "Stop Voice Control" : "Start Voice Control (CoderSpeak)"}>
+            <Tooltip content={
+              !voiceEnabled
+                ? 'Voice control is disabled in settings'
+                : isListening
+                  ? 'Stop Voice Control'
+                  : 'Start Voice Control (CoderSpeak)'
+            }>
               <button 
-                onClick={toggleListening} 
-                className={`${styles.micBtn} ${isListening ? styles.micActive : ''}`}
+                onClick={toggleListening}
+                className={`${styles.micBtn} ${isListening ? styles.micActive : ''} ${!voiceEnabled ? styles.micDisabled : ''}`}
+                disabled={!voiceEnabled}
                 title="Global Voice Control"
               >
                 {isListening ? <Mic size={18} className={styles.micIconActive} /> : <MicOff size={18} />}
@@ -80,6 +105,13 @@ export default function Navbar() {
 
           {user ? (
             <div className={styles.userProfile}>
+              {billingLabel && (
+                <Tooltip content={billingTooltip}>
+                  <Link to="/settings" className={`${styles.planPill} ${billingStatus === 'canceling' ? styles.planPillWarning : ''}`}>
+                    {billingLabel}
+                  </Link>
+                </Tooltip>
+              )}
               <Link to="/settings" className={styles.userBtn}>
                 <div className={styles.userAvatar}>
                   {user.avatar_url ? (

@@ -106,7 +106,12 @@ export default function PublicProfile() {
         {snippets.length > 0 ? (
           <div className={styles.grid}>
             {snippets.map((snippet: any) => (
-              <Link to={`/compiler?id=${snippet._id}`} key={snippet._id} className={styles.card}>
+              <Link
+                to="/compiler"
+                state={{ snippet }}
+                key={snippet.id}
+                className={styles.card}
+              >
                 <div className={styles.cardHeader}>
                   <span className={styles.lang}>{snippet.language}</span>
                   <ExternalLink size={16} className={styles.linkIcon} />

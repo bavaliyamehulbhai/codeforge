@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useLocation, Link } from 'react-router-dom'
 import CodeMirror from '@uiw/react-codemirror'
 import { vscodeDark } from '@uiw/codemirror-theme-vscode'
@@ -15,12 +15,13 @@ import {
   Maximize2, Minimize2, Code2, Sparkles, History,
   Headphones, BookTemplate, Settings as SettingsIcon,
   Flame, Timer, MessageSquare, Send, Keyboard,
-  Mic, MicOff
+  Mic, MicOff, Link2
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { useToast } from '@/lib/toast-context'
 import { useSnippets } from '@/hooks/useSnippets'
 import { useCompiler } from '@/hooks/useCompiler'
+import axios from 'axios'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { LANGUAGES } from '@/lib/languages'
 import * as htmlToImage from 'html-to-image'
@@ -34,11 +35,19 @@ import { useAPMTracker } from '@/hooks/useAPMTracker'
 import { BOILERPLATES } from '@/lib/boilerplates'
 import VoiceWaveform from '@/components/VoiceWaveform'
 import styles from './Compiler.module.css'
+import * as Y from 'yjs'
+import * as awareness from 'y-protocols/awareness'
+import { yCollab } from 'y-codemirror.next'
+import { io, Socket } from 'socket.io-client'
+
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
 export default function Compiler() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const { saveSnippet, updateSnippet } = useSnippets()
+  const hasScheduledCancel = Boolean(user?.subscription?.cancel_at_period_end)
+  const { saveSnippet, updateSnippet, incrementRunCount } = useSnippets()
   const { 
     code, setCode, language, setLanguage, output, isRunning, runCode,
     fontSize, updateFontSize, theme, updateTheme, setOutput 
@@ -48,6 +57,8 @@ export default function Compiler() {
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const [snippetId, setSnippetId] = useState<string | null>(null)
+  const [workspaceId, setWorkspaceId] = useState<string>('personal')
+  const [workspaces, setWorkspaces] = useState<any[]>([])
   const [isSaving, setIsSaving] = useState(false)
   // Show language picker unless user arrived from a saved snippet
   const [hasPickedLanguage, setHasPickedLanguage] = useState(false)
@@ -80,8 +91,40 @@ export default function Compiler() {
   ])
   const [chatInput, setChatInput] = useState('')
 
+  // Collaboration State
+  const [isCollaborating, setIsCollaborating] = useState(false)
+  const [roomId, setRoomId] = useState<string | null>(null)
+  const [yDoc, setYDoc] = useState<Y.Doc | null>(null)
+  const [socket, setSocket] = useState<Socket | null>(null)
+  const [collaborators, setCollaborators] = useState<any[]>([])
+  const [awarenessState, setAwarenessState] = useState<any>(null)
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [usage, setUsage] = useState({ compiler_runs: 0, voice_minutes: 0 })
+  const [limits, setLimits] = useState({ compiler_runs: 0, voice_minutes: 0 })
+  const voiceEnabled = user?.preferences?.voiceEnabled ?? true
+
   // CoderSpeak Functionality
   const { isListening, toggleListening, isSupported, registerPageActions } = useGlobalCoderSpeak()
+
+  // Collaboration Termination
+  const stopCollaboration = () => {
+    if (socket) {
+      socket.disconnect();
+      setSocket(null);
+    }
+    setYDoc(null);
+    setAwarenessState(null);
+    setIsCollaborating(false);
+    setCollaborators([]);
+    setRoomId(null);
+    
+    // Clear room from URL
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.delete('room');
+    window.history.pushState({}, '', newUrl);
+    
+    toast('Collaboration session ended', 'info');
+  };
 
   // Pomodoro Effect
   useEffect(() => {
@@ -103,6 +146,30 @@ export default function Compiler() {
     const s = seconds % 60
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   }
+
+  const formatDate = (value: string | null | undefined) => {
+    if (!value) return 'N/A'
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return 'N/A'
+    return parsed.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  }
+
+  useEffect(() => {
+    if (!user) return
+    const token = localStorage.getItem('codeforge_token')
+    const fetchUsage = async () => {
+      try {
+        const { data } = await axios.get(`${API_URL}/auth/usage`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        })
+        setUsage(data?.usage || { compiler_runs: 0, voice_minutes: 0 })
+        setLimits(data?.limits || { compiler_runs: 0, voice_minutes: 0 })
+      } catch (err) {
+        // Ignore usage errors in compiler view.
+      }
+    }
+    fetchUsage()
+  }, [user])
 
   // Rubber Duck Chat Logic
   const handleDuckSubmit = (e: React.FormEvent) => {
@@ -223,9 +290,215 @@ export default function Compiler() {
       setTitle(snippet.title || 'Untitled Snippet')
       setSnippetId(snippet.id)
       setTags(snippet.tags || [])
+      setWorkspaceId(snippet.workspace_id || 'personal')
       setHasPickedLanguage(true) // Skip picker for loaded snippets
     }
   }, [location.state, setCode, setLanguage])
+
+  useEffect(() => {
+    if (location.state?.snippet) return
+    const params = new URLSearchParams(location.search)
+    const workspaceParam = params.get('workspace_id')
+    if (workspaceParam) {
+      setWorkspaceId(workspaceParam)
+    }
+  }, [location.search, location.state])
+
+  useEffect(() => {
+    if (!user) return
+    const token = localStorage.getItem('codeforge_token')
+    const fetchWorkspaces = async () => {
+      try {
+        const { data } = await axios.get(`${API_URL}/workspaces`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        })
+        setWorkspaces(data)
+      } catch (err) {
+        console.error('Failed to fetch workspaces', err)
+      }
+    }
+    fetchWorkspaces()
+  }, [user])
+
+  // Auto-join room from URL
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const roomParam = params.get('room');
+    if (roomParam && !isCollaborating) {
+       setRoomId(roomParam);
+    }
+  }, [location.search, isCollaborating]);
+
+  useEffect(() => {
+    if (roomId && !isCollaborating && user) {
+       startCollaboration(roomId);
+    }
+  }, [roomId, user]);
+
+  // Collaboration Logic
+  const startCollaboration = (existingRoomId?: string) => {
+    if (isCollaborating) return;
+    
+    const idToUse = existingRoomId || snippetId || Math.random().toString(36).substring(2, 9);
+    setRoomId(idToUse);
+
+    // Update URL without reloading if it's a new room
+    if (!existingRoomId) {
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set('room', idToUse);
+      window.history.pushState({}, '', newUrl);
+      
+      // Copy to clipboard
+      navigator.clipboard.writeText(newUrl.toString());
+      toast('Collaboration link copied to clipboard!', 'success');
+    }
+    
+    const doc = new Y.Doc();
+    const newSocket = io(SOCKET_URL, { transports: ['websocket'] });
+    
+    setYDoc(doc);
+    setSocket(newSocket);
+    setIsCollaborating(true);
+    
+    const joinRoom = () => {
+      newSocket.emit('join-room', idToUse, { name: user?.username || 'Anonymous', avatar: user?.avatar_url });
+    };
+
+    if (newSocket.connected) {
+      joinRoom();
+    } else {
+      newSocket.on('connect', joinRoom);
+    }
+    
+    const yText = doc.getText('codemirror');
+    const yOutput = doc.getMap('output');
+    
+    // Awareness for cursors
+    const awarenessInstance = new awareness.Awareness(doc);
+    setAwarenessState(awarenessInstance);
+    
+    awarenessInstance.setLocalStateField('user', {
+      name: user?.username || 'Anonymous',
+      color: '#' + Math.floor(Math.random() * 16777215).toString(16), // Random color
+      avatar: user?.avatar_url,
+      typing: false
+    });
+
+    // Initial sync from server
+    newSocket.on('initial-sync', (update) => {
+      const uint8Update = new Uint8Array(update);
+      if (uint8Update.length > 0) {
+        Y.applyUpdate(doc, uint8Update, 'remote');
+      } else if (code) {
+        // I am likely the host, upload my current code
+        yText.insert(0, code);
+      }
+
+      // Initial output sync
+      const remoteOutput = yOutput.get('data');
+      if (remoteOutput) {
+        try {
+          setOutput(JSON.parse(remoteOutput as string));
+        } catch (e) { console.error('Failed to parse remote output', e); }
+      }
+    });
+
+    // Sync output changes
+    yOutput.observe((event) => {
+      if (event.transaction.origin !== 'remote') return;
+      const data = yOutput.get('data');
+      if (data) {
+        try {
+          setOutput(JSON.parse(data as string));
+        } catch (e) { console.error('Failed to parse remote output update', e); }
+      } else {
+        setOutput(null);
+      }
+    });
+
+    // Keep local state in sync with Yjs
+    yText.observe(() => {
+      setCode(yText.toString());
+    });
+
+    doc.on('update', (update, origin) => {
+      if (origin !== 'remote') {
+        newSocket.emit('sync-update', idToUse, update);
+      }
+    });
+
+    newSocket.on('sync-update', (update) => {
+      Y.applyUpdate(doc, new Uint8Array(update), 'remote');
+    });
+
+    // Awareness sync
+    awarenessInstance.on('update', () => {
+      const state = awareness.encodeAwarenessUpdate(awarenessInstance, Array.from(awarenessInstance.getStates().keys()));
+      newSocket.emit('awareness-update', idToUse, state);
+      
+      const states = Array.from(awarenessInstance.getStates());
+      const peers = states
+        .filter(([clientId]) => clientId !== awarenessInstance.clientID)
+        .map(([, s]: [any, any]) => s.user)
+        .filter((u: any) => u);
+      setCollaborators(peers);
+    });
+
+    newSocket.on('awareness-update', (update) => {
+      awareness.applyAwarenessUpdate(awarenessInstance, new Uint8Array(update), 'remote');
+    });
+
+    toast('Collaboration Mode Active!', 'success');
+  };
+
+  // Synchronize CoderSpeak Actions
+  useEffect(() => {
+    registerPageActions({
+      'run code': handleRun,
+      'save snippet': handleSave,
+      'format code': handleFormat,
+      'prepare code': handlePrepareCode,
+      'reset environment': resetEnvironment,
+      'toggle focus mode': () => setIsFocusMode(prev => !prev),
+      'toggle music': toggleFocusAudio,
+      'stop music': () => toggleFocusAudio(),
+      'start collaboration': () => startCollaboration(),
+      'stop collaboration': stopCollaboration,
+      'copy share link': handleShare,
+      'clear console': clearConsole,
+    });
+  }, [code, language, snippetId, tags, isCollaborating, roomId, socket]);
+
+  useEffect(() => {
+    if (!socket || !roomId) return;
+
+    socket.on('user-joined', ({ user }) => {
+      toast(`${user?.name || 'Someone'} joined the room`, 'info');
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [socket, roomId]);
+
+  const collabExtension = useMemo(() => {
+    if (isCollaborating && yDoc && awarenessState) {
+      return [yCollab(yDoc.getText('codemirror'), awarenessState)];
+    }
+    return [];
+  }, [isCollaborating, yDoc, awarenessState]);
+
+  // Sync local output to Yjs
+  useEffect(() => {
+    if (isCollaborating && yDoc && output) {
+      const yOutput = yDoc.getMap('output');
+      const current = yOutput.get('data');
+      const serialized = JSON.stringify(output);
+      if (current !== serialized) {
+        yOutput.set('data', serialized);
+      }
+    }
+  }, [output, isCollaborating, yDoc]);
 
   const getExtensions = () => {
     switch (language) {
@@ -243,6 +516,13 @@ export default function Compiler() {
   const handleRun = async () => {
     const lang = LANGUAGES.find(l => l.value === language)
     if (lang) {
+      if (user && snippetId) {
+        const result = await incrementRunCount(snippetId)
+        if (!result.ok) {
+          toast(result.error || 'Run limit reached', 'error')
+          return
+        }
+      }
       toast(`Compiling ${lang.name}...`, 'info')
       runCode(lang.id)
     }
@@ -252,7 +532,8 @@ export default function Compiler() {
     if (!user) return toast('Please sign in to save snippets', 'error')
     setIsSaving(true)
     try {
-      const snippetData = { title, language, code, is_public: true, tags }
+      const payloadWorkspaceId = workspaceId === 'personal' ? null : workspaceId
+      const snippetData = { title, language, code, is_public: true, tags, workspace_id: payloadWorkspaceId }
       let result;
       
       if (snippetId) {
@@ -292,6 +573,28 @@ export default function Compiler() {
     const shareUrl = `${window.location.origin}/share/${snippetId}`
     navigator.clipboard.writeText(shareUrl)
     toast('Share link copied to clipboard!', 'success')
+  }
+
+  const handleCopyCollabLink = async () => {
+    if (!roomId) return toast('No active collaboration room', 'info')
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.set('room', roomId)
+      await navigator.clipboard.writeText(url.toString())
+      toast('Collaboration link copied!', 'success')
+    } catch (err) {
+      toast('Failed to copy collaboration link', 'error')
+    }
+  }
+
+  const handleCopyRoomId = async () => {
+    if (!roomId) return toast('No active collaboration room', 'info')
+    try {
+      await navigator.clipboard.writeText(roomId)
+      toast('Room ID copied!', 'success')
+    } catch (err) {
+      toast('Failed to copy room ID', 'error')
+    }
   }
 
   const copyToClipboard = (text: string) => {
@@ -618,6 +921,20 @@ export default function Compiler() {
               </select>
               <ChevronDown size={14} className={styles.chevron} />
             </div>
+
+            <div className={styles.workspaceSelector}>
+              <select
+                value={workspaceId}
+                onChange={(e) => setWorkspaceId(e.target.value)}
+                className={styles.select}
+              >
+                <option value="personal">Personal</option>
+                {workspaces.map((ws) => (
+                  <option key={ws.id} value={ws.id}>{ws.name}</option>
+                ))}
+              </select>
+              <ChevronDown size={14} className={styles.chevron} />
+            </div>
             
             <div className={styles.divider} />
             
@@ -713,14 +1030,46 @@ export default function Compiler() {
               <span className={styles.btnText}>Forge</span>
             </button>
           </Tooltip>
+
+          {isCollaborating && (
+             <>
+               <div className={styles.divider} />
+               <Tooltip content="Invite Collaborators">
+                 <button onClick={() => setShowInviteModal(true)} className={styles.miniBtn}>
+                   <Globe size={18} className={styles.activeIcon} />
+                 </button>
+               </Tooltip>
+               <Tooltip content="Copy Fusion Link">
+                 <button onClick={handleCopyCollabLink} className={styles.miniBtn}>
+                   <Link2 size={18} />
+                 </button>
+               </Tooltip>
+               <Tooltip content="Stop Fusion Session">
+                 <button onClick={stopCollaboration} className={clsx(styles.miniBtn, styles.dangerBtn)}>
+                   <History size={18} />
+                 </button>
+               </Tooltip>
+               <div className={styles.statusBadge}>
+                 <div className={styles.pulseDot} />
+                 <span>Fusion Active</span>
+               </div>
+             </>
+          )}
           
           <div className={styles.divider} />
           
           {isSupported && user && (
-            <Tooltip content={isListening ? "Stop CoderSpeak" : "CoderSpeak (Voice to Code)"}>
+            <Tooltip content={
+              !voiceEnabled
+                ? 'Voice control is disabled in settings'
+                : isListening
+                  ? 'Stop CoderSpeak'
+                  : 'CoderSpeak (Voice to Code)'
+            }>
               <button 
-                onClick={toggleListening} 
-                className={clsx(styles.miniBtn, isListening && styles.micActive)}
+                onClick={toggleListening}
+                className={clsx(styles.miniBtn, isListening && styles.micActive, !voiceEnabled && styles.miniBtnDisabled)}
+                disabled={!voiceEnabled}
               >
                 {isListening ? <Mic size={18} className={styles.micIconActive} /> : <MicOff size={18} />}
               </button>
@@ -752,6 +1101,41 @@ export default function Compiler() {
               <Globe size={18} />
             </button>
           </Tooltip>
+
+          <div className={styles.collabGroup}>
+            {isCollaborating && (
+              <div className={styles.avatarGroup}>
+                {collaborators.slice(0, 3).map((c, i) => (
+                  <div 
+                    key={i} 
+                    className={clsx(styles.avatar, c.typing && styles.avatarTyping)} 
+                    style={{ borderColor: c.color || 'var(--accent)' }}
+                  >
+                    {c.avatar ? (
+                      <img src={c.avatar} alt={c.name} />
+                    ) : (
+                      <span>{c.name?.charAt(0).toUpperCase()}</span>
+                    )}
+                    {c.typing && <div className={styles.typingDot} />}
+                  </div>
+                ))}
+                {collaborators.length > 3 && (
+                  <div className={styles.avatarMore}>
+                    +{collaborators.length - 3}
+                  </div>
+                )}
+              </div>
+            )}
+            <Tooltip content={isCollaborating ? "Invite Collaborators" : "Start Collaboration"}>
+              <button 
+                onClick={isCollaborating ? () => setShowInviteModal(true) : () => startCollaboration()} 
+                className={clsx(styles.collabBtn, isCollaborating && styles.activeCollab)}
+              >
+                <MessageSquare size={18} />
+                {!isCollaborating && <span className={styles.collabBadge}>NEW</span>}
+              </button>
+            </Tooltip>
+          </div>
           <button onClick={handleRun} disabled={isRunning} className={styles.runBtn}>
             {isRunning ? <Loader2 className={styles.spin} size={18} /> : <Play size={18} />}
             <span className={styles.btnText}>Run</span>
@@ -763,18 +1147,60 @@ export default function Compiler() {
         </div>
       </header>
 
+      {hasScheduledCancel && (
+        <div className={styles.cancelBanner}>
+          <div>
+            <strong>Cancellation scheduled:</strong> Access ends on {formatDate(user?.subscription?.current_period_end)}.
+          </div>
+          <Link to="/settings" className={styles.cancelCta}>Manage billing</Link>
+        </div>
+      )}
+
+      {limits.compiler_runs > 0 && usage.compiler_runs / limits.compiler_runs >= 0.8 && (
+        <div className={styles.quotaBanner}>
+          <div>
+            <strong>Usage alert:</strong> You have used {usage.compiler_runs} of {limits.compiler_runs} compiler runs.
+          </div>
+          <Link to="/settings" className={styles.quotaCta}>Upgrade plan</Link>
+        </div>
+      )}
+
+      {limits.voice_minutes > 0 && usage.voice_minutes / limits.voice_minutes >= 0.8 && (
+        <div className={styles.quotaBanner}>
+          <div>
+            <strong>Usage alert:</strong> You have used {usage.voice_minutes} of {limits.voice_minutes} voice minutes.
+          </div>
+          <Link to="/settings" className={styles.quotaCta}>Upgrade plan</Link>
+        </div>
+      )}
+
       <main className={clsx(styles.main, isFocusMode && styles.focusMode)}>
         <div className={clsx(styles.editorPane, apm > 80 && styles.overclock, isPomodoroActive && styles.deepWorkMode)}>
           <CodeMirror
-            value={code}
+            value={isCollaborating ? undefined : code}
             height="100%"
             theme={theme === 'one-dark' ? oneDark : vscodeDark}
             extensions={[
               ...getExtensions(), 
               wordWrap ? EditorView.lineWrapping : [],
-              lineNumbers ? [] : [EditorView.theme({ ".cm-gutters": { display: "none" } })]
+              lineNumbers ? [] : [EditorView.theme({ ".cm-gutters": { display: "none" } })],
+              ...collabExtension
             ]}
-            onChange={(val) => setCode(val)}
+            onChange={(val) => {
+              setCode(val);
+              if (isCollaborating && awarenessState) {
+                awarenessState.setLocalStateField('user', {
+                  ...awarenessState.getLocalState().user,
+                  typing: true
+                });
+                setTimeout(() => {
+                  awarenessState.setLocalStateField('user', {
+                    ...awarenessState.getLocalState().user,
+                    typing: false
+                  });
+                }, 2000);
+              }
+            }}
             className={clsx(styles.editor, !showMinimap && styles.hideMinimap)}
             style={{ fontSize: `${fontSize}px` }}
           />
@@ -1126,6 +1552,73 @@ export default function Compiler() {
           </div>
         </div>
       )}
+      {/* Invite Modal */}
+      {showInviteModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowInviteModal(false)}>
+          <div className={styles.inviteModal} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <div className={styles.modalTitleRow}>
+                <Sparkles size={20} className={styles.accentIcon} style={{ color: 'var(--accent)' }} />
+                <h3>Invite to Forge</h3>
+              </div>
+              <button onClick={() => setShowInviteModal(false)} className={styles.closeBtn}>×</button>
+            </div>
+            
+            <div className={styles.inviteContent}>
+              <p className={styles.inviteDesc}>Collaborate in real-time with your team. Share this unique link to start forging together.</p>
+              
+              <div className={styles.shareLinkWrapper}>
+                <input 
+                  type="text" 
+                  readOnly 
+                  value={`${window.location.origin}${window.location.pathname}?room=${roomId}`}
+                  className={styles.shareLinkInput}
+                />
+                <button onClick={handleCopyCollabLink} className={styles.copyLinkBtn}>
+                  <Copy size={14} />
+                  <span>Copy</span>
+                </button>
+              </div>
+
+              <div className={styles.roomIdRow}>
+                <span className={styles.roomIdLabel}>Room ID</span>
+                <div className={styles.roomIdBox}>
+                  <span className={styles.roomIdValue}>{roomId || 'N/A'}</span>
+                  <button type="button" onClick={handleCopyRoomId} className={styles.roomIdCopy}>
+                    <Copy size={12} />
+                    Copy ID
+                  </button>
+                </div>
+              </div>
+
+              <div className={styles.collaboratorList}>
+                <h4>Active Contributors ({collaborators.length + 1})</h4>
+                <div className={styles.contributorItem}>
+                  <div className={styles.contributorAvatar} style={{ background: 'var(--accent)' }}>
+                    {user?.username?.charAt(0).toUpperCase()}
+                  </div>
+                  <span className={styles.contributorName}>{user?.username} (You)</span>
+                  <span className={styles.contributorStatus}>Host</span>
+                </div>
+                {collaborators.map((c, i) => (
+                  <div key={i} className={styles.contributorItem}>
+                    <div className={styles.contributorAvatar} style={{ background: c.color || 'var(--accent)' }}>
+                      {c.name?.charAt(0).toUpperCase()}
+                    </div>
+                    <span className={styles.contributorName}>{c.name}</span>
+                    <span className={styles.contributorStatus}>Peer</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className={styles.modalFooter}>
+              <button onClick={() => setShowInviteModal(false)} className={styles.saveBtn}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Voice Help Modal */}
       {showVoiceHelp && (
         <div className={styles.modalOverlay} onClick={() => setShowVoiceHelp(false)}>

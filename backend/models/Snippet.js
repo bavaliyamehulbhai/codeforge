@@ -1,55 +1,69 @@
-const mongoose = require('mongoose')
+const mongoose = require("mongoose");
 
-const snippetSchema = new mongoose.Schema({
-  user_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-    index: true,
+const snippetSchema = new mongoose.Schema(
+  {
+    user_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    workspace_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Workspace",
+      default: null,
+      index: true,
+    },
+    title: {
+      type: String,
+      required: [true, "Snippet title is required"],
+      trim: true,
+      maxlength: [100, "Title cannot exceed 100 characters"],
+    },
+    language: {
+      type: String,
+      required: [true, "Language is required"],
+      trim: true,
+      lowercase: true,
+    },
+    code: {
+      type: String,
+      required: [true, "Code content is required"],
+      maxlength: [50000, "Code cannot exceed 50,000 characters"],
+    },
+    is_public: {
+      type: Boolean,
+      default: false,
+    },
+    likes: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    run_count: {
+      type: Number,
+      default: 0,
+    },
+    tags: [
+      {
+        type: String,
+        trim: true,
+        lowercase: true,
+      },
+    ],
   },
-  title: {
-    type: String,
-    required: [true, 'Snippet title is required'],
-    trim: true,
-    maxlength: [100, 'Title cannot exceed 100 characters'],
+  {
+    timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
   },
-  language: {
-    type: String,
-    required: [true, 'Language is required'],
-    trim: true,
-    lowercase: true,
-  },
-  code: {
-    type: String,
-    required: [true, 'Code content is required'],
-    maxlength: [50000, 'Code cannot exceed 50,000 characters'],
-  },
-  is_public: {
-    type: Boolean,
-    default: false,
-  },
-  likes: [{ 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'User' 
-  }],
-  run_count: {
-    type: Number,
-    default: 0,
-  },
-  tags: [{
-    type: String,
-    trim: true,
-    lowercase: true,
-  }],
-}, {
-  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
-})
+);
 
 // Transform output to match frontend Snippet type
 snippetSchema.methods.toPublic = function () {
   return {
     id: this._id.toString(),
     user_id: this.user_id.toString(),
+    workspace_id: this.workspace_id ? this.workspace_id.toString() : null,
     title: this.title,
     language: this.language,
     code: this.code,
@@ -59,7 +73,7 @@ snippetSchema.methods.toPublic = function () {
     tags: this.tags || [],
     created_at: this.created_at.toISOString(),
     updated_at: this.updated_at.toISOString(),
-  }
-}
+  };
+};
 
-module.exports = mongoose.model('Snippet', snippetSchema)
+module.exports = mongoose.model("Snippet", snippetSchema);

@@ -4,7 +4,7 @@ import VoiceWaveform from './VoiceWaveform';
 import styles from './VoiceHUD.module.css';
 
 export default function VoiceHUD() {
-  const { isListening, status, lastCommand, interimTranscript } = useGlobalCoderSpeak();
+  const { isListening, status, lastCommand, interimTranscript, engine } = useGlobalCoderSpeak();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -28,6 +28,9 @@ export default function VoiceHUD() {
             {status === 'processing' && 'Thinking...'}
             {status === 'success' && 'Command Accepted'}
             {status === 'error' && 'Error'}
+          </span>
+          <span className={styles.engineTag}>
+            {engine === 'deepgram' ? 'Deepgram' : engine === 'browser' ? 'Browser' : 'Offline'}
           </span>
         </div>
 

@@ -12,10 +12,11 @@ export function useSnippets() {
 
   const getHeaders = () => {
     const token = localStorage.getItem('codeforge_token')
+    if (!token) return {}
     return { Authorization: `Bearer ${token}` }
   }
 
-  const fetchSnippets = useCallback(async (params?: { search?: string, language?: string, tag?: string }) => {
+  const fetchSnippets = useCallback(async (params?: { search?: string, language?: string, tag?: string, workspace_id?: string }) => {
     if (!user) { setSnippets([]); return }
     setLoading(true)
     
@@ -52,6 +53,7 @@ export function useSnippets() {
     code: string
     is_public?: boolean
     tags?: string[]
+    workspace_id?: string | null
   }): Promise<Snippet | null> => {
     if (!user) return null
 
@@ -63,6 +65,7 @@ export function useSnippets() {
       is_public: data.is_public ?? false,
       tags: data.tags ?? [],
       user_id: user.id,
+      workspace_id: data.workspace_id ?? null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       run_count: 0,
@@ -116,11 +119,16 @@ export function useSnippets() {
     }
   }
 
-  const incrementRunCount = async (id: string) => {
+  const incrementRunCount = async (id: string): Promise<{ ok: boolean; remainingRuns?: number; error?: string }> => {
     try {
-      await axios.post(`${API_URL}/snippets/${id}/run`)
-    } catch (err) {
+      const { data } = await axios.post(`${API_URL}/snippets/${id}/run`, {}, {
+        headers: getHeaders()
+      })
+      return { ok: true, remainingRuns: data?.remaining_runs }
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Run limit reached'
       console.error('Error incrementing run count:', err)
+      return { ok: false, error: message }
     }
   }
 

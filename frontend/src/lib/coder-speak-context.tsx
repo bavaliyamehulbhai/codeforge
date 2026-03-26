@@ -4,6 +4,8 @@ import { useAuth } from './auth-context';
 import { useToast } from './toast-context';
 import VoiceHUD from '@/components/VoiceHUD';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
 interface SpeechRecognitionEvent extends Event {
   results: SpeechRecognitionResultList;
   resultIndex: number;
@@ -46,6 +48,7 @@ interface CoderSpeakContextType {
   status: 'idle' | 'listening' | 'processing' | 'success' | 'error';
   lastCommand: string | null;
   interimTranscript: string;
+  engine: 'browser' | 'deepgram' | 'offline';
 }
 
 const CoderSpeakContext = createContext<CoderSpeakContextType | undefined>(undefined);
@@ -56,6 +59,7 @@ export function CoderSpeakProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<'idle' | 'listening' | 'processing' | 'success' | 'error'>('idle');
   const [lastCommand, setLastCommand] = useState<string | null>(null);
   const [interimTranscript, setInterimTranscript] = useState('');
+  const [engine, setEngine] = useState<'browser' | 'deepgram' | 'offline'>('browser');
   
   const isListeningRef = useRef(false);
   const lastProcessedRef = useRef<number>(0);
@@ -80,6 +84,9 @@ export function CoderSpeakProvider({ children }: { children: ReactNode }) {
         recog.lang = 'en-US';
 
         setRecognition(recog);
+        setEngine('browser');
+      } else {
+        setEngine('offline');
       }
     }
   }, []);
@@ -185,8 +192,23 @@ export function CoderSpeakProvider({ children }: { children: ReactNode }) {
   // 3. Deepgram Implementation
   const startDeepgram = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/voice/token');
-      const { token } = await response.json();
+      const tokenValue = localStorage.getItem('codeforge_token');
+      const response = await fetch(`${API_URL}/voice/token`, {
+        headers: tokenValue ? { Authorization: `Bearer ${tokenValue}` } : {}
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (response.status === 429) {
+          toast('Voice usage limit reached. Switching to browser mode.', 'info');
+          startFallback();
+          return;
+        }
+        toast(payload?.error || 'Voice service unavailable. Switching to browser mode.', 'error');
+        startFallback();
+        return;
+      }
+
+      const { token } = payload;
       if (!token) throw new Error('No token');
 
       const socket = new WebSocket('wss://api.deepgram.com/v1/listen?model=nova-2&interim_results=true', ['token', token]);
@@ -208,6 +230,7 @@ export function CoderSpeakProvider({ children }: { children: ReactNode }) {
           setStatus('listening');
           setIsListening(true);
           isListeningRef.current = true;
+          setEngine('deepgram');
           toast('Production Voice Active (Deepgram)', 'success');
         } catch (err) {
           console.error('[Deepgram Mic Error]', err);
@@ -240,6 +263,7 @@ export function CoderSpeakProvider({ children }: { children: ReactNode }) {
 
   const startFallback = () => {
     if (recognition && !isListening) {
+      setEngine('browser');
       recognition.start();
       setIsListening(true);
       isListeningRef.current = true;
@@ -264,6 +288,10 @@ export function CoderSpeakProvider({ children }: { children: ReactNode }) {
       toast('Please sign in to use voice control', 'error');
       return;
     }
+    if (user.preferences?.voiceEnabled === false) {
+      toast('Voice control is disabled in settings', 'info');
+      return;
+    }
     startDeepgram();
   }, [user]);
 
@@ -283,9 +311,20 @@ export function CoderSpeakProvider({ children }: { children: ReactNode }) {
       toast('Please sign in to use voice control', 'error');
       return;
     }
+    if (user.preferences?.voiceEnabled === false) {
+      toast('Voice control is disabled in settings', 'info');
+      return;
+    }
     if (isListening) stopListening();
     else startListening();
   }, [isListening, startListening, stopListening, user]);
+
+  useEffect(() => {
+    if (user?.preferences?.voiceEnabled === false && isListening) {
+      stopListening();
+      toast('Voice control disabled in settings', 'info');
+    }
+  }, [isListening, stopListening, toast, user?.preferences?.voiceEnabled]);
 
   const registerPageActions = useCallback((commands: CommandHandler, onDictate?: (text: string) => void) => {
     pageCommandsRef.current = commands;
@@ -306,7 +345,8 @@ export function CoderSpeakProvider({ children }: { children: ReactNode }) {
       registerPageActions,
       status,
       lastCommand,
-      interimTranscript
+      interimTranscript,
+      engine
     }}>
       {children}
       <VoiceHUD />

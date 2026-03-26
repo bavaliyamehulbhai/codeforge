@@ -19,10 +19,27 @@ export interface User {
     tabSize: number
     voiceEnabled: boolean
   }
+  plan?: 'free' | 'pro' | 'team' | 'enterprise'
+  subscription?: {
+    status: string
+    provider: string
+    current_period_end: string | null
+    cancel_at_period_end?: boolean
+  }
+  usage?: {
+    compiler_runs: number
+    voice_minutes: number
+    updated_at: string | null
+  }
   streak_count: number
   achievements: Achievement[]
   last_active: string | null
   created_at: string
+}
+
+export interface UsageLimits {
+  compiler_runs: number
+  voice_minutes: number
 }
 
 export interface Achievement {
@@ -35,6 +52,7 @@ export interface Achievement {
 export interface Snippet {
   id: string
   user_id: string
+  workspace_id?: string | null
   title: string
   language: string
   code: string
