@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom'
 import axios from 'axios'
 import { 
   Search, Globe, Heart,
-  ArrowUpRight, Play, Library
+  ArrowUpRight, Play, Library,
+  TrendingUp, Clock, Award, Twitter
 } from 'lucide-react'
+import clsx from 'clsx'
 import { useSnippets } from '@/hooks/useSnippets'
 import { Snippet } from '@/types'
 import Skeleton from '@/components/Skeleton'
@@ -18,6 +20,8 @@ export default function Gallery() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [language, setLanguage] = useState('all')
+  const [activeTab, setActiveTab] = useState<'trending' | 'newest' | 'hall-of-fame'>('trending')
+  const [peekingId, setPeekingId] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchPublicFeed = async () => {
@@ -33,43 +37,78 @@ export default function Gallery() {
     fetchPublicFeed()
   }, [])
 
-  const filteredSnippets = snippets.filter(s => {
-    const matchesSearch = s.title.toLowerCase().includes(search.toLowerCase())
-    const matchesLang = language === 'all' || s.language === language
-    return matchesSearch && matchesLang
-  })
+  const filteredSnippets = snippets
+    .filter(s => {
+      const matchesSearch = s.title.toLowerCase().includes(search.toLowerCase())
+      const matchesLang = language === 'all' || s.language === language
+      return matchesSearch && matchesLang
+    })
+    .sort((a, b) => {
+      if (activeTab === 'newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      if (activeTab === 'hall-of-fame') return b.likes - a.likes
+      // Trending: basic mix of likes and recency
+      return (b.likes * 2 + b.run_count) - (a.likes * 2 + a.run_count)
+    })
+
+  const shareOnTwitter = (s: Snippet) => {
+    const url = `https://codeforge.netlify.app/share/${s.id}`
+    window.open(`https://twitter.com/intent/tweet?text=Check out this ${s.language} snippet on CodeForge: ${s.title}&url=${encodeURIComponent(url)}`, '_blank')
+  }
 
   return (
     <div className={styles.container}>
       <header className={styles.header}>
         <div className={styles.headerInfo}>
           <div className={styles.badge}><Globe size={14} /> Global Feed</div>
-          <h1>Public Gallery</h1>
+          <h1>Public <span className={styles.accent}>Gallery</span></h1>
           <p>Discover and fork amazing code snippets from the CodeForge community.</p>
         </div>
 
-        <div className={styles.controls}>
-          <div className={styles.searchBar}>
-            <Search size={18} className={styles.searchIcon} />
-            <input 
-              type="text" 
-              placeholder="Search public snippets..." 
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+        <div className={styles.navBlock}>
+          <div className={styles.tabs}>
+            <button 
+              className={clsx(styles.tab, activeTab === 'trending' && styles.activeTab)}
+              onClick={() => setActiveTab('trending')}
+            >
+              <TrendingUp size={16} /> Trending
+            </button>
+            <button 
+              className={clsx(styles.tab, activeTab === 'newest' && styles.activeTab)}
+              onClick={() => setActiveTab('newest')}
+            >
+              <Clock size={16} /> Newest
+            </button>
+            <button 
+              className={clsx(styles.tab, activeTab === 'hall-of-fame' && styles.activeTab)}
+              onClick={() => setActiveTab('hall-of-fame')}
+            >
+              <Award size={16} /> Hall of Fame
+            </button>
           </div>
-          <select 
-            value={language} 
-            onChange={e => setLanguage(e.target.value)}
-            className={styles.filter}
-          >
-            <option value="all">All Languages</option>
-            <option value="javascript">JavaScript</option>
-            <option value="python">Python</option>
-            <option value="cpp">C++</option>
-            <option value="java">Java</option>
-            <option value="rust">Rust</option>
-          </select>
+
+          <div className={styles.controls}>
+            <div className={styles.searchBar}>
+              <Search size={18} className={styles.searchIcon} />
+              <input 
+                type="text" 
+                placeholder="Search snippets..." 
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+            <select 
+              value={language} 
+              onChange={e => setLanguage(e.target.value)}
+              className={styles.filter}
+            >
+              <option value="all">All Languages</option>
+              <option value="javascript">JavaScript</option>
+              <option value="python">Python</option>
+              <option value="cpp">C++</option>
+              <option value="java">Java</option>
+              <option value="rust">Rust</option>
+            </select>
+          </div>
         </div>
       </header>
 
@@ -81,16 +120,32 @@ export default function Gallery() {
             </div>
           ))
         ) : filteredSnippets.map(s => (
-          <div key={s.id} className={`${styles.card} premium-glass`}>
+          <div 
+            key={s.id} 
+            className={`${styles.card} premium-glass`}
+            onMouseEnter={() => setPeekingId(s.id)}
+            onMouseLeave={() => setPeekingId(null)}
+          >
             <div className={styles.cardContent}>
               <div className={styles.cardHead}>
-                <span className={styles.langBadge}>{s.language}</span>
-                <span className={styles.owner}>@{s.user_id.substring(0, 8)}</span>
+                <div className={styles.headLeft}>
+                  <span className={styles.langBadge}>{s.language}</span>
+                  <span className={styles.owner}>@{s.user_id.substring(0, 8)}</span>
+                </div>
+                <div className={styles.headRight}>
+                  <button onClick={() => shareOnTwitter(s)} className={styles.shareBtn} title="Share to X">
+                    <Twitter size={14} />
+                  </button>
+                </div>
               </div>
               <h3 className={styles.title}>{s.title}</h3>
-              <p className={styles.preview}>
-                {s.code.substring(0, 100)}...
-              </p>
+              
+              <div className={styles.previewContainer}>
+                <pre className={clsx(styles.previewCode, peekingId === s.id && styles.peeking)}>
+                  {s.code.substring(0, 200)}
+                </pre>
+                {peekingId === s.id && <div className={styles.peekGlow} />}
+              </div>
             </div>
             <div className={styles.cardFooter}>
               <div className={styles.footerLeft}>
@@ -104,7 +159,7 @@ export default function Gallery() {
                   <span>{s.likes}</span>
                 </button>
                 <Link to={`/share/${s.id}`} className={styles.viewBtn}>
-                  View <ArrowUpRight size={14} />
+                  Peek <ArrowUpRight size={14} />
                 </Link>
               </div>
               <Link to="/compiler" state={{ snippet: s }} className={styles.forkBtn}>

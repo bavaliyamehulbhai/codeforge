@@ -3,13 +3,16 @@ import axios from 'axios'
 const RAPIDAPI_KEY = import.meta.env.VITE_JUDGE0_API_KEY
 const JUDGE0_URL = import.meta.env.VITE_JUDGE0_API_URL || 'https://judge0-ce.p.rapidapi.com'
 
-export async function executeCode(languageId: number, sourceCode: string): Promise<any> {
+export async function executeCode(languageId: number, sourceCode: string, stdin: string = ''): Promise<any> {
   try {
-    // Unicode-safe Base64 encoding
-    const encodedSource = btoa(
-      new Uint8Array(new TextEncoder().encode(sourceCode))
+    // Unicode-safe Base64 encoding for code and stdin
+    const encode = (str: string) => btoa(
+      new Uint8Array(new TextEncoder().encode(str))
         .reduce((data, byte) => data + String.fromCharCode(byte), '')
     )
+
+    const encodedSource = encode(sourceCode)
+    const encodedStdin = encode(stdin)
 
     const headers: Record<string, string> = {}
     if (RAPIDAPI_KEY) {
@@ -22,6 +25,7 @@ export async function executeCode(languageId: number, sourceCode: string): Promi
       {
         language_id: languageId,
         source_code: encodedSource,
+        stdin: encodedStdin,
       },
       { headers }
     )

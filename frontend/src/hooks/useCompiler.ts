@@ -7,6 +7,7 @@ export function useCompiler() {
   const [language, setLanguage] = useState('javascript')
   const [output, setOutput] = useState<ExecutionResult | null>(null)
   const [isRunning, setIsRunning] = useState(false)
+  const [stdin, setStdin] = useState('')
   const [fontSize, setFontSize] = useState(() => Number(localStorage.getItem('codeforge_fontsize')) || 14)
   const [theme, setTheme] = useState(() => localStorage.getItem('codeforge_theme') || 'vscode-dark')
 
@@ -14,10 +15,11 @@ export function useCompiler() {
     setIsRunning(true)
     setOutput(null)
     try {
-      const result = await executeCode(languageId, code)
+      const result = await executeCode(languageId, code, stdin)
       setOutput(result as any)
+      return result
     } catch (err) {
-      setOutput({
+      const errorResult = {
         stdout: null,
         stderr: 'Execution failed. Please check your connection or API key.',
         compile_output: null,
@@ -25,7 +27,9 @@ export function useCompiler() {
         status: { id: 0, description: 'Error' },
         time: '0.0',
         memory: 0
-      })
+      }
+      setOutput(errorResult)
+      return errorResult
     } finally {
       setIsRunning(false)
     }
@@ -43,6 +47,7 @@ export function useCompiler() {
 
   return { 
     code, setCode, 
+    stdin, setStdin,
     language, setLanguage, 
     output, setOutput, isRunning, runCode,
     fontSize, updateFontSize,

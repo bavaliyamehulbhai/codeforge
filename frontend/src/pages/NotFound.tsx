@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Home, Search, Code2, MoveLeft } from 'lucide-react'
+import { Home, Search } from 'lucide-react'
 import styles from './NotFound.module.css'
 
 export default function NotFound() {

@@ -30,25 +30,30 @@ import { EditorView } from '@codemirror/view'
 import { useFocusAudio } from '@/hooks/useFocusAudio'
 import { useAPMTracker } from '@/hooks/useAPMTracker'
 import { BOILERPLATES } from '@/lib/boilerplates'
+import { AdSlot } from '@/components/AdSlot'
 import styles from './Compiler.module.css'
 
 export default function Compiler() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const { saveSnippet } = useSnippets()
+  const { saveSnippet, fetchSnippetById } = useSnippets()
   const { 
-    code, setCode, language, setLanguage, output, isRunning, runCode,
+    code, setCode, stdin, setStdin, language, setLanguage, output, isRunning, runCode,
     fontSize, updateFontSize, theme, updateTheme, setOutput 
   } = useCompiler()
   const location = useLocation()
   const [title, setTitle] = useState('Untitled Snippet')
   const [snippetId, setSnippetId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [showStdin, setShowStdin] = useState(false)
+  const [executionHistory, setExecutionHistory] = useState<any[]>([])
+  
   // Show language picker unless user arrived from a saved snippet
   const [hasPickedLanguage, setHasPickedLanguage] = useState(false)
   const [isFocusMode, setIsFocusMode] = useState(false)
   const [isAssistantOpen, setIsAssistantOpen] = useState(false)
   const [isForging, setIsForging] = useState(false)
+  const [isScanning, setIsScanning] = useState(false)
   const [showSnapshotModal, setShowSnapshotModal] = useState(false)
   
   // Advanced Features State
@@ -65,7 +70,7 @@ export default function Compiler() {
   const apm = useAPMTracker()
   const [pomodoroTime, setPomodoroTime] = useState(25 * 60) // 25 minutes
   const [isPomodoroActive, setIsPomodoroActive] = useState(false)
-  const [activeTab, setActiveTab] = useState<'insights' | 'duck'>('insights')
+  const [activeTab, setActiveTab] = useState<'insights' | 'duck' | 'history'>('insights')
   const [duckMessages, setDuckMessages] = useState<{sender: 'user'|'duck', text: string}[]>([
     { sender: 'duck', text: "Quack! Tell me what's broken and I'll help you debug it." }
   ])
@@ -180,15 +185,36 @@ export default function Compiler() {
   };
 
   useEffect(() => {
+    const searchParams = new URLSearchParams(location.search)
+    const id = searchParams.get('id')
+
     if (location.state?.snippet) {
       const { snippet } = location.state
       setCode(snippet.code)
       setLanguage(snippet.language)
       setTitle(snippet.title || 'Untitled Snippet')
       setSnippetId(snippet.id)
-      setHasPickedLanguage(true) // Skip picker for loaded snippets
+      setHasPickedLanguage(true)
+    } else if (id) {
+      // Deep link or refresh - fetch the snippet
+      const loadSnippet = async () => {
+        setIsScanning(true)
+        const s = await fetchSnippetById(id)
+        if (s) {
+          setCode(s.code)
+          setLanguage(s.language)
+          setTitle(s.title)
+          setSnippetId(s.id)
+          setHasPickedLanguage(true)
+          toast('Syncing codebase...', 'success')
+        } else {
+          toast('Failed to load snippet', 'error')
+        }
+        setIsScanning(false)
+      }
+      loadSnippet()
     }
-  }, [location.state, setCode, setLanguage])
+  }, [location.state, location.search, setCode, setLanguage])
 
   const getExtensions = () => {
     switch (language) {
@@ -207,7 +233,16 @@ export default function Compiler() {
     const lang = LANGUAGES.find(l => l.value === language)
     if (lang) {
       toast(`Compiling ${lang.name}...`, 'info')
-      runCode(lang.id)
+      const result = await runCode(lang.id)
+      // Save to history
+      if (result) {
+        setExecutionHistory(prev => [{
+          timestamp: new Date().toLocaleTimeString(),
+          language: lang.name,
+          status: (result as any).status?.description || 'Done',
+          output: (result as any).stdout || (result as any).stderr || 'No output'
+        }, ...prev].slice(0, 10))
+      }
     }
   }
 
@@ -245,14 +280,18 @@ export default function Compiler() {
   }
 
   const handleForge = () => {
-    setIsForging(true)
-    toast('Initializing Neural Forge...', 'info')
+    setIsScanning(true)
+    toast('Scanning Neural Structure...', 'info')
     
     setTimeout(() => {
+      setIsScanning(false)
+      setIsForging(true)
+      toast('Forging & Optimizing...', 'success')
+      
       const formatted = formatCode(code, language)
       if (formatted === code) {
         setIsForging(false)
-        toast('Code is already optimally forged.', 'info')
+        toast('Code is already optimal.', 'info')
         return
       }
       
@@ -266,14 +305,14 @@ export default function Compiler() {
         if (currentLine >= lines.length) {
           clearInterval(interval)
           setIsForging(false)
-          toast('Code Forged & Optimized!', 'success')
+          toast('Code Forged Successfully!', 'success')
           return
         }
         currentText += (currentLine > 0 ? '\n' : '') + lines[currentLine]
         setCode(currentText)
         currentLine++
-      }, 40) // Rapid typing effect
-    }, 800)
+      }, 30) // Rapid typing effect
+    }, 1500) // Scanning duration
   }
 
   const getInsights = () => {
@@ -525,6 +564,15 @@ export default function Compiler() {
             className={styles.editor}
             style={{ fontSize: `${fontSize}px` }}
           />
+          {isScanning && (
+            <div className={styles.scanningOverlay}>
+              <div className={styles.scanLine} />
+              <div className={styles.scanText}>
+                <Cpu className={styles.spin} size={32} />
+                <p>Neural Scan in Progress...</p>
+              </div>
+            </div>
+          )}
           {isRunning && (
             <div className={styles.editorOverlay}>
               <div className={styles.loaderLine} />
@@ -592,23 +640,34 @@ export default function Compiler() {
                 Insights
               </button>
               <button 
+                className={clsx(styles.tabBtn, activeTab === 'history' && styles.activeTab)}
+                onClick={() => setActiveTab('history')}
+              >
+                History
+              </button>
+              <button 
                 className={clsx(styles.tabBtn, activeTab === 'duck' && styles.activeTab)}
                 onClick={() => setActiveTab('duck')}
               >
-                Rubber Duck
+                Duck
               </button>
-              <div className={styles.tabIndicator} style={{ left: activeTab === 'insights' ? '0' : '50%' }} />
+              <div className={styles.tabIndicator} style={{ 
+                left: activeTab === 'insights' ? '0' : activeTab === 'history' ? '33.3%' : '66.6%',
+                width: '33.3%'
+              }} />
             </div>
             
             <div className={styles.assistantContent}>
-              {activeTab === 'insights' ? (
+              <div className={styles.adSidebar}>
+                <AdSlot id="adsterra-sidebar" />
+              </div>
+              {activeTab === 'insights' && (
                 <>
                   <div className={styles.insightCard}>
                     <span className={styles.insightLabel}>Complexity</span>
                     <span className={styles.insightValue}>{getInsights().complexity}</span>
                     <div className={styles.insightBar}><div style={{ width: getInsights().complexity === 'O(1)' ? '30%' : '80%' }} /></div>
                   </div>
-
                   <div className={styles.insightCard}>
                     <span className={styles.insightLabel}>System Health</span>
                     <span className={styles.insightValue}>{getInsights().health}</span>
@@ -657,7 +716,32 @@ export default function Compiler() {
                     <p>Neural engine analysis complete.</p>
                   </div>
                 </>
-              ) : (
+              )}
+              
+              {activeTab === 'history' && (
+                <div className={styles.historyTab}>
+                  <h4>Neural Exec History</h4>
+                  {executionHistory.length > 0 ? (
+                    <div className={styles.historyList}>
+                      {executionHistory.map((h, i) => (
+                        <div key={i} className={styles.historyItem}>
+                          <div className={styles.historyItemHead}>
+                            <span className={styles.historyTime}>{h.timestamp}</span>
+                            <span className={clsx(styles.historyStatus, h.status === 'Accepted' ? styles.statusOk : styles.statusErr)}>
+                              {h.status}
+                            </span>
+                          </div>
+                          <p className={styles.historyLang}>{h.language}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className={styles.emptyHistory}>No code executed in this session.</div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'duck' && (
                 <div className={styles.duckContainer}>
                   <div className={styles.chatLog}>
                     {duckMessages.map((msg, i) => (
@@ -692,6 +776,13 @@ export default function Compiler() {
               <span>Console Output</span>
             </div>
             <div className={styles.outputActions}>
+              <button 
+                onClick={() => setShowStdin(!showStdin)} 
+                className={clsx(styles.actionBtn, showStdin && styles.activeActionBtn)}
+                title="Custom Input (stdin)"
+              >
+                <Keyboard size={14} />
+              </button>
               <button onClick={() => copyToClipboard(output?.stdout || '')} disabled={!output} className={styles.actionBtn} title="Copy Output">
                 <Copy size={14} />
               </button>
@@ -714,6 +805,22 @@ export default function Compiler() {
               </div>
             )}
           </div>
+          
+          {showStdin && (
+            <div className={styles.stdinArea}>
+              <div className={styles.stdinHeader}>
+                <span>Standard Input (stdin)</span>
+                <button onClick={() => setStdin('')} className={styles.clearStdin}>Clear</button>
+              </div>
+              <textarea
+                value={stdin}
+                onChange={(e) => setStdin(e.target.value)}
+                placeholder="Enter input here..."
+                className={styles.stdinInput}
+              />
+            </div>
+          )}
+
           <div className={styles.outputContent}>
             {output ? (
               <div className={styles.result}>
@@ -748,6 +855,14 @@ export default function Compiler() {
                 </div>
               </div>
             )}
+          </div>
+
+          <div className={styles.adContainer}>
+            <div className={styles.adHeader}>
+              <Sparkles size={12} />
+              <span>Sponsor Slot</span>
+            </div>
+            <AdSlot id="adsterra-banner" className={styles.adPlaceholder} />
           </div>
         </div>
       </main>

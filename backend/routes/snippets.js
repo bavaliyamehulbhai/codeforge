@@ -2,8 +2,12 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const Snippet = require('../models/Snippet');
+const NodeCache = require('node-cache');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'codeforge_super_secret_key_change_me';
+
+// Neural Cache (30s TTL for public feed)
+const neuralCache = new NodeCache({ stdTTL: 30, checkperiod: 60 });
 
 // Auth Middleware
 const protect = (req, res, next) => {
@@ -32,8 +36,13 @@ router.get('/', protect, async (req, res) => {
       query.language = language;
     }
 
-    const snippets = await Snippet.find(query).sort({ created_at: -1 });
-    res.json(snippets.map(s => s.toPublic()));
+    const snippets = await Snippet.find(query).sort({ created_at: -1 }).lean();
+    res.json(snippets.map(s => {
+      const ps = { ...s, id: s._id };
+      delete ps._id;
+      delete ps.__v;
+      return ps;
+    }));
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch snippets' });
   }
@@ -98,10 +107,24 @@ router.delete('/:id', protect, async (req, res) => {
 // Get All Public Snippets (Global Gallery)
 router.get('/feed/public', async (req, res) => {
   try {
+    const cacheKey = 'public_feed';
+    const cachedFeed = neuralCache.get(cacheKey);
+    if (cachedFeed) return res.json(cachedFeed);
+
     const snippets = await Snippet.find({ is_public: true })
       .sort({ created_at: -1 })
-      .limit(50);
-    res.json(snippets.map(s => s.toPublic()));
+      .limit(50)
+      .lean();
+    
+    const publicSnippets = snippets.map(s => {
+      const ps = { ...s, id: s._id };
+      delete ps._id;
+      delete ps.__v;
+      return ps;
+    });
+
+    neuralCache.set(cacheKey, publicSnippets);
+    res.json(publicSnippets);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch public feed' });
   }

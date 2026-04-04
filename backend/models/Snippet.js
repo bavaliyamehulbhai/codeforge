@@ -40,6 +40,11 @@ const snippetSchema = new mongoose.Schema({
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
 })
 
+// High-Performance Neural Indices
+snippetSchema.index({ is_public: 1, created_at: -1 });
+snippetSchema.index({ language: 1 });
+snippetSchema.index({ title: 'text' });
+
 // Transform output to match frontend Snippet type
 snippetSchema.methods.toPublic = function () {
   return {

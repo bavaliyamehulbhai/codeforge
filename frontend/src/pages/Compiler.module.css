@@ -5,6 +5,7 @@
   background: var(--bg-dark);
   height: 100vh;
   position: relative;
+  overflow: hidden;
 }
 
 /* ───── HEADER ───── */
@@ -746,6 +747,7 @@ input:checked + .slider:before {
   background: #09090b;
   overflow: hidden;
   border-right: 1px solid var(--border-bright);
+  min-height: 0;
 }
 
 .editor {
@@ -840,6 +842,7 @@ input:checked + .slider:before {
   background: #050507;
   border-left: 1px solid var(--border-bright);
   box-shadow: -10px 0 30px rgba(0, 0, 0, 0.4);
+  min-height: 0;
 }
 
 .outputHeader {

@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/lib/auth-context'
 import { useSnippets } from '@/hooks/useSnippets'
-import { 
-  Code2, Sparkles, Play, Zap, 
-  ArrowRight, Clock, Library, Plus, ChevronRight
+import {
+  Code2, Sparkles, Zap,
+  Clock, Library, ChevronRight,
+  TrendingUp, Activity, Settings
 } from 'lucide-react'
 import { LANGUAGES } from '@/lib/languages'
 import { TEMPLATES } from '@/lib/templates'
@@ -13,46 +15,125 @@ import styles from './Home.module.css'
 export default function Home() {
   const { user } = useAuth()
   const { snippets, loading: snippetsLoading } = useSnippets()
+  const [quickForgeTitle, setQuickForgeTitle] = useState('')
 
   const recentSnippets = snippets.slice(0, 3)
+
+  // Calculate Neural Streak (Consecutive days with snippets)
+  const calculateStreak = () => {
+    if (snippets.length === 0) return 0
+    
+    // Get unique dates in YYYY-MM-DD format, sorted descending
+    const activeDates = Array.from(new Set(
+      snippets.map(s => new Date(s.created_at).toISOString().split('T')[0])
+    )).sort((a, b) => b.localeCompare(a))
+
+    let streak = 0
+    let today = new Date().toISOString().split('T')[0]
+    let yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+
+    // Start checking from the most recent active date
+    if (activeDates[0] !== today && activeDates[0] !== yesterday) {
+      return 0 // Streak broken if no activity today or yesterday
+    }
+
+    let currentDate = new Date(activeDates[0])
+    for (let i = 0; i < activeDates.length; i++) {
+      const activeDateStr = activeDates[i]
+      const expectedDateStr = currentDate.toISOString().split('T')[0]
+
+      if (activeDateStr === expectedDateStr) {
+        streak++
+        currentDate.setDate(currentDate.getDate() - 1)
+      } else {
+        break
+      }
+    }
+    return streak
+  }
+
+  const streak = calculateStreak()
 
   if (user) {
     return (
       <div className={styles.main}>
         <div className={styles['grid-overlay']} />
-        
+        <div className={styles['hud-lattice']} />
+        <div className={styles['hud-frame']} />
+
         <section className={styles.dashboard}>
           <div className={styles.dashHeader}>
             <div className={styles.welcome}>
-              <h1>Welcome back, <span className={styles.accent}>{user.username}</span></h1>
-              <p>Your workspace is ready. What are we building today?</p>
+              <div className={styles.statusBadge}>
+                <div className={styles.onlineDot} />
+                Neural Forge Alpha: [CONNECTIVITY_STABLE]
+              </div>
+              <h1 className={styles.hudHeading}>Command <span className={styles.accent}>Center</span></h1>
+              <div className={styles.quickForge}>
+                <div className={styles.inputWrapper}>
+                  <Code2 size={18} className={styles.inputIcon} />
+                  <input 
+                    type="text" 
+                    placeholder="Initialize new forge project..." 
+                    className={styles.forgeInput} 
+                    value={quickForgeTitle}
+                    onChange={(e) => setQuickForgeTitle(e.target.value)}
+                  />
+                </div>
+                <Link 
+                  to="/compiler" 
+                  state={{ snippet: { title: quickForgeTitle || 'Untitled Forge' } }}
+                  className={styles.quickForgeBtn}
+                >
+                  Forge <Zap size={14} fill="currentColor" />
+                </Link>
+              </div>
             </div>
-            <Link to="/compiler" className={styles.createBtn}>
-              <Plus size={20} />
-              <span>New Snippet</span>
-            </Link>
+            <div className={styles.quickActions}>
+              <button className={styles.actionIconButton} title="Settings">
+                <Settings size={18} />
+              </button>
+              <button className={styles.actionIconButton} title="Cloud Status">
+                <Activity size={18} />
+              </button>
+            </div>
           </div>
 
           <div className={styles.statsGrid}>
-            <div className={`${styles.statCard} premium-glass`}>
-              <Library className={styles.statIcon} />
-              <div>
-                <p className={styles.statLabel}>Total Projects</p>
-                <p className={styles.statValue}>{snippets.length}</p>
+            <div className={styles.hudNode}>
+              <div className={styles.nodeStatus} />
+              <div className={styles.nodeScanner} />
+              <div className={styles.nodeIcon}><Library size={20} /></div>
+              <div className={styles.nodeBody}>
+                <p className={styles.nodeLabel}>Global Vault</p>
+                <p className={styles.nodeValue}>{snippets.length}</p>
+              </div>
+              <div className={styles.nodePulse} />
+            </div>
+
+            <div className={styles.hudNode}>
+              <div className={styles.nodeStatus} />
+              <div className={styles.nodeScanner} />
+              <div className={styles.nodeIcon}><TrendingUp size={20} /></div>
+              <div className={styles.nodeBody}>
+                <p className={styles.nodeLabel}>Neural Streak</p>
+                <p className={styles.nodeValue}>{streak}<span className={styles.nodeUnit}>d</span></p>
+              </div>
+              <div className={styles.nodeTrend}>
+                <div className={styles.trendPeak} style={{ height: '60%' }} />
+                <div className={styles.trendPeak} style={{ height: '80%' }} />
+                <div className={styles.trendPeak} style={{ height: '40%' }} />
+                <div className={styles.trendPeak} style={{ height: '90%' }} />
               </div>
             </div>
-            <div className={`${styles.statCard} premium-glass`}>
-              <Play className={styles.statIcon} />
-              <div>
-                <p className={styles.statLabel}>Executions</p>
-                <p className={styles.statValue}>142</p>
-              </div>
-            </div>
-            <div className={`${styles.statCard} premium-glass`}>
-              <Clock className={styles.statIcon} />
-              <div>
-                <p className={styles.statLabel}>Time Spent</p>
-                <p className={styles.statValue}>12.4h</p>
+
+            <div className={styles.hudNode}>
+              <div className={styles.nodeStatus} />
+              <div className={styles.nodeScanner} />
+              <div className={styles.nodeIcon}><Zap size={20} /></div>
+              <div className={styles.nodeBody}>
+                <p className={styles.nodeLabel}>Forge Credits</p>
+                <p className={styles.nodeValue}>942.5</p>
               </div>
             </div>
           </div>
@@ -60,12 +141,12 @@ export default function Home() {
           <div className={styles.dashMain}>
             <div className={styles.recentSection}>
               <div className={styles.sectionHead}>
-                <h2>Recent Snippets</h2>
+                <h2>Recent Forges</h2>
                 <Link to="/snippets" className={styles.viewLink}>
-                  View All <ArrowRight size={14} />
+                  View Vault <ChevronRight size={14} />
                 </Link>
               </div>
-
+              {/* Existing recent grid */}
               <div className={styles.recentGrid}>
                 {snippetsLoading ? (
                   Array(3).fill(0).map((_, i) => (
@@ -79,36 +160,61 @@ export default function Home() {
                   ))
                 ) : recentSnippets.length > 0 ? (
                   recentSnippets.map(s => (
-                    <Link key={s.id} to={`/compiler?id=${s.id}`} className={`${styles.miniCard} premium-glass`}>
-                      <Code2 className={styles.miniIcon} size={24} />
-                      <div className={styles.miniInfo}>
-                        <h4>{s.title}</h4>
-                        <span>{s.language} • {new Date(s.created_at).toLocaleDateString()}</span>
+                    <Link key={s.id} to={`/compiler?id=${s.id}`} className={`${styles.terminalEntry} premium-glass`}>
+                      <div className={styles.terminalIcon}>
+                        <Code2 size={18} />
                       </div>
+                      <div className={styles.terminalBody}>
+                        <div className={styles.terminalHeader}>
+                          <h4>{s.title}</h4>
+                          <span className={styles.termLang}>{s.language}</span>
+                        </div>
+                        <div className={styles.termSpecs}>
+                          <span className={styles.spec}><Clock size={10} /> {new Date(s.created_at).toLocaleDateString()}</span>
+                          <span className={styles.spec}>•</span>
+                          <span className={styles.spec}>ID: {s.id.substring(0, 6)}</span>
+                          <span className={styles.spec}>•</span>
+                          <span className={styles.spec}>LATENCY: 12ms</span>
+                        </div>
+                      </div>
+                      <ChevronRight className={styles.termArrow} size={16} />
                     </Link>
                   ))
                 ) : (
                   <div className={styles.emptyRecent}>
-                    <p>No snippets yet. Start coding to see them here!</p>
+                    <p>No snippets found.</p>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className={styles.templateSection}>
-              <h2>Top Templates</h2>
-              <div className={styles.templateGridDash}>
-                {TEMPLATES.slice(0, 4).map(t => (
-                  <Link 
-                    key={t.id} 
-                    to="/compiler" 
-                    state={{ snippet: { code: t.code, language: t.language, title: t.title } }}
-                    className={styles.dashTemplate}
-                  >
-                    <span>{t.title}</span>
-                    <ArrowRight size={14} />
-                  </Link>
-                ))}
+            <div className={styles.sideCol}>
+              <div className={styles.forgeEvents}>
+                <h3>Forge Activity</h3>
+                <div className={styles.eventList}>
+                  {recentSnippets.length > 0 ? (
+                    recentSnippets.map((s) => (
+                      <div key={s.id} className={styles.eventItem}>
+                        <div className={styles.eventDot} />
+                        <div className={styles.eventInfo}>
+                          <p>Forge optimization applied to <strong>{s.title}</strong></p>
+                          <span>{new Date(s.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className={styles.emptyActivity}>
+                      <p>No forge activity recorded.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className={styles.promoCard}>
+                <div className={styles.promoIcon}><Sparkles size={24} /></div>
+                <h4>Go Pro</h4>
+                <p>Unlock unlimited cloud credits and priority forge queues.</p>
+                <button className={styles.promoBtn}>Upgrade Now</button>
               </div>
             </div>
           </div>
@@ -120,7 +226,14 @@ export default function Home() {
   return (
     <div className={styles.main}>
       <div className={styles['grid-overlay']} />
-      
+
+      {/* Dynamic Background Orbs */}
+      <div className={styles.orbs}>
+        <div className={styles.orb} />
+        <div className={styles.orb} />
+        <div className={styles.orb} />
+      </div>
+
       <section className={styles.hero}>
         <div className={styles.heroInner}>
           <div className={`${styles.badge} ${styles.animateIn}`} style={{ '--delay': '0s' } as any}>
@@ -128,7 +241,7 @@ export default function Home() {
             Production Ready Environment
           </div>
           <h1 className={`${styles.heading} ${styles.animateIn}`} style={{ '--delay': '0.1s' } as any}>
-            The Future of <br/>
+            The Future of <br />
             <span className={styles.accent}>Neural Coding.</span>
           </h1>
           <p className={`${styles.subheading} ${styles.animateIn}`} style={{ '--delay': '0.2s' } as any}>
@@ -151,8 +264,8 @@ export default function Home() {
         </div>
 
         <div className={styles.previewContainer}>
-          <div 
-            className={`${styles.codePreview} ${styles.animateIn}`} 
+          <div
+            className={`${styles.codePreview} ${styles.animateIn}`}
             style={{ '--delay': '0.5s', '--rx': '0deg', '--ry': '0deg' } as any}
             onMouseMove={(e) => {
               const rect = e.currentTarget.getBoundingClientRect()
@@ -200,8 +313,8 @@ export default function Home() {
 
           <div className={styles.templateGrid}>
             {TEMPLATES.map((t, i) => (
-              <div 
-                key={t.id} 
+              <div
+                key={t.id}
                 className={`${styles.templateCard} premium-glass ${styles.animateIn}`}
                 style={{ '--delay': `${0.7 + i * 0.1}s` } as any}
               >
@@ -210,8 +323,8 @@ export default function Home() {
                 <p className={styles.templateDesc}>{t.description}</p>
                 <div className={styles.templateMeta}>
                   <span className={styles.templateLang}>{t.language}</span>
-                  <Link 
-                    to="/compiler" 
+                  <Link
+                    to="/compiler"
                     state={{ snippet: { code: t.code, language: t.language, title: t.title } }}
                     className={styles.launchBtn}
                   >
@@ -223,6 +336,49 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <footer className={styles.footer}>
+        <div className={styles.footerInner}>
+          <div className={styles.footerBrand}>
+            <div className={styles.logo}>
+              <div className={styles.logoIcon}>
+                <Code2 size={20} />
+              </div>
+              <span className={styles.logoText}>CodeForge</span>
+            </div>
+            <p className={styles.brandDesc}>
+              The next generation of cloud compilation. Built for speed, scaled for developers.
+            </p>
+          </div>
+
+          <div className={styles.footerLinks}>
+            <div className={styles.linkGroup}>
+              <h4>Platform</h4>
+              <Link to="/compiler">Compiler</Link>
+              <Link to="/snippets">Explore</Link>
+              <Link to="/gallery">Showcase</Link>
+            </div>
+            <div className={styles.linkGroup}>
+              <h4>Resources</h4>
+              <a href="#">Documentation</a>
+              <a href="#">API Reference</a>
+              <a href="#">Community</a>
+            </div>
+            <div className={styles.linkGroup}>
+              <h4>Legal</h4>
+              <a href="#">Privacy Policy</a>
+              <a href="#">Terms of Service</a>
+              <a href="#">Cookies</a>
+            </div>
+          </div>
+        </div>
+        <div className={styles.footerBottom}>
+          <p>© 2026 CodeForge. All rights reserved.</p>
+          <div className={styles.socials}>
+            {/* Social icons could go here */}
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }
