@@ -42,7 +42,19 @@ export default function Settings() {
     }
   }
 
-  if (!user) return <div className={styles.error}>Please sign in to access settings.</div>
+  if (!user) {
+    return (
+      <div className={styles.emptyAuth}>
+        <ShieldCheck className={styles.emptyIcon} size={52} />
+        <h2>Sign in to manage your account</h2>
+        <p>Update your profile, security settings, and preferences.</p>
+        <div className={styles.emptyActions}>
+          <a href="/auth" className={styles.primaryAction}>Sign In</a>
+          <a href="/compiler" className={styles.secondaryAction}>Go to Compiler</a>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={styles.container}>

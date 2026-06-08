@@ -1,24 +1,28 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap');
+
 :root {
-  /* Core Palette - Ultra Dark & Sophisticated */
-  --bg-dark: #050507;
-  --bg-surface: #0a0a0e;
-  --bg-elevated: #121218;
+  /* Core Palette - Deep Ink */
+  --bg-dark: #05070b;
+  --bg-surface: #0a0f16;
+  --bg-elevated: #111823;
   
-  /* Accent - Golden Amber with high vibrance */
-  --accent: #f59e0b;
-  --accent-hover: #fbbf24;
-  --accent-dim: hsla(38, 92%, 55%, 0.08);
-  --accent-glow: hsla(38, 92%, 55%, 0.4);
+  /* Accent System - Ember + Neon Cyan */
+  --accent: #ffb347;
+  --accent-hover: #ffd28a;
+  --accent-2: #00d1ff;
+  --accent-3: #2dff9c;
+  --accent-dim: hsla(35, 100%, 63%, 0.1);
+  --accent-glow: hsla(35, 100%, 63%, 0.45);
   
   /* Text System */
-  --text-primary: #fcfcfd;
-  --text-secondary: #94a3b8;
-  --text-muted: #475569;
+  --text-primary: #f8fafc;
+  --text-secondary: #a6b6cc;
+  --text-muted: #5c6b82;
   
   /* Borders & Glass */
   --border: hsla(0, 0%, 100%, 0.06);
   --border-bright: hsla(0, 0%, 100%, 0.12);
-  --glass-bg: hsla(240, 10%, 4%, 0.4);
+  --glass-bg: hsla(220, 20%, 6%, 0.5);
   --glass-border: hsla(0, 0%, 100%, 0.05);
   
   /* Border Radius */
@@ -33,14 +37,14 @@
   --transition-slow: 0.7s cubic-bezier(0.2, 0, 0, 1);
   
   /* Fonts */
-  --font-display: 'Outfit', 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'Space Mono', ui-monospace, SFMono-Regular, monospace;
   
   /* Status Colors */
   --success: #10b981;
   --error: #ef4444;
   --warning: #f59e0b;
-  --info: #3b82f6;
+  --info: #3bdcff;
 
   /* Skeleton Tokens */
   --skeleton-bg: hsla(240, 10%, 12%, 0.4);
@@ -156,6 +160,36 @@
 }
 
 .magnetic-btn {
+      /* Borders & Glass */
+      --border: hsla(0, 0%, 100%, 0.06);
+      --border-bright: hsla(0, 0%, 100%, 0.12);
+      --glass-bg: hsla(240, 10%, 4%, 0.4);
+      --glass-border: hsla(0, 0%, 100%, 0.05);
+  
+      /* Border Radius */
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 24px;
+      --radius-full: 9999px;
+  
+      /* Transitions */
+      --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      --transition: 0.4s cubic-bezier(0.2, 0, 0, 1);
+      --transition-slow: 0.7s cubic-bezier(0.2, 0, 0, 1);
+  
+      /* Fonts */
+      --font-display: 'Outfit', 'Inter', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  
+      /* Status Colors */
+      --success: #10b981;
+      --error: #ef4444;
+      --warning: #f59e0b;
+      --info: #3b82f6;
+  
+      /* Skeleton Tokens */
+      --skeleton-bg: hsla(240, 10%, 12%, 0.4);
+      --skeleton-highlight: hsla(240, 10%, 20%, 0.6);
   position: relative;
   overflow: hidden;
 }
@@ -200,18 +234,15 @@ body {
 a {
   text-decoration: none;
   color: inherit;
-  transition: all var(--transition-fast);
+  background: hsla(220, 20%, 6%, 0.7);
 }
 
 button {
   cursor: pointer;
   border: none;
   background: none;
-  font-family: inherit;
+  box-shadow: inset 0 0 20px 0 hsla(190, 100%, 60%, 0.04);
   transition: all var(--transition-fast);
-}
-
-input, textarea, select {
   font-family: inherit;
 }
 
@@ -244,9 +275,9 @@ input, textarea, select {
   width: 140%;
   aspect-ratio: 1;
   background: 
-    radial-gradient(40% 40% at 70% 30%, hsla(38, 92%, 55%, 0.04) 0%, transparent 100%),
-    radial-gradient(35% 35% at 20% 70%, hsla(38, 92%, 55%, 0.03) 0%, transparent 100%),
-    radial-gradient(50% 50% at 50% 50%, hsla(240, 10%, 15%, 0.02) 0%, transparent 100%);
+    radial-gradient(40% 40% at 70% 30%, hsla(35, 100%, 63%, 0.06) 0%, transparent 100%),
+    radial-gradient(35% 35% at 20% 70%, hsla(190, 100%, 60%, 0.05) 0%, transparent 100%),
+    radial-gradient(50% 50% at 50% 50%, hsla(210, 20%, 18%, 0.03) 0%, transparent 100%);
   filter: blur(80px);
   animation: neural-flow 40s ease-in-out infinite alternate;
   z-index: 0;
@@ -258,8 +289,8 @@ input, textarea, select {
   position: fixed;
   inset: 0;
   background-image: 
-    linear-gradient(to right, hsla(38, 92%, 55%, 0.015) 1px, transparent 1px),
-    linear-gradient(to bottom, hsla(38, 92%, 55%, 0.015) 1px, transparent 1px);
+    linear-gradient(to right, hsla(190, 100%, 60%, 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, hsla(190, 100%, 60%, 0.025) 1px, transparent 1px);
   background-size: 80px 80px;
   mask-image: radial-gradient(circle at center, black, transparent 80%);
   pointer-events: none;

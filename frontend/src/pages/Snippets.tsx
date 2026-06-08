@@ -61,7 +61,19 @@ export default function Snippets() {
     return 0
   })
 
-  if (!user) return <div className={styles.empty}>Please sign in to view your snippets.</div>
+  if (!user) {
+    return (
+      <div className={styles.emptyAuth}>
+        <Code2 size={48} />
+        <h3>Sign in to access your snippets</h3>
+        <p>Save, organize, and revisit your projects across devices.</p>
+        <div className={styles.emptyActions}>
+          <Link to="/auth" className={styles.primaryAction}>Sign In</Link>
+          <Link to="/compiler" className={styles.secondaryAction}>Try the Compiler</Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={styles.container}>

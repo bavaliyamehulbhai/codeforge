@@ -12,6 +12,7 @@ export function useSnippets() {
 
   const getHeaders = () => {
     const token = localStorage.getItem('codeforge_token')
+    if (!token) return undefined
     return { Authorization: `Bearer ${token}` }
   }
 
@@ -20,8 +21,9 @@ export function useSnippets() {
     setLoading(true)
     
     try {
+      const headers = getHeaders()
       const { data } = await axios.get(`${API_URL}/snippets`, {
-        headers: getHeaders(),
+        headers,
         params
       })
       setSnippets(data)
@@ -34,8 +36,9 @@ export function useSnippets() {
 
   const fetchSnippetById = async (id: string): Promise<Snippet | null> => {
     try {
+      const headers = getHeaders()
       const { data } = await axios.get(`${API_URL}/snippets/${id}`, {
-        headers: getHeaders()
+        headers
       })
       return data
     } catch (err) {
@@ -69,8 +72,9 @@ export function useSnippets() {
     setSnippets(prev => [tempSnippet, ...prev])
 
     try {
+      const headers = getHeaders()
       const { data: newSnippet } = await axios.post(`${API_URL}/snippets`, data, {
-        headers: getHeaders()
+        headers
       })
       // Replace temp snippet with real one
       setSnippets(prev => prev.map(s => s.id === tempId ? newSnippet : s))
@@ -88,8 +92,9 @@ export function useSnippets() {
     setSnippets(prev => prev.filter(s => s.id !== id))
 
     try {
+      const headers = getHeaders()
       await axios.delete(`${API_URL}/snippets/${id}`, {
-        headers: getHeaders()
+        headers
       })
       return true
     } catch (err) {
@@ -111,8 +116,9 @@ export function useSnippets() {
   const toggleLike = async (id: string): Promise<{ likes: number; isLiked: boolean } | null> => {
     if (!user) return null
     try {
+      const headers = getHeaders()
       const { data } = await axios.post(`${API_URL}/snippets/${id}/like`, {}, {
-        headers: getHeaders()
+        headers
       })
       setSnippets(prev => prev.map(s => s.id === id ? { ...s, likes: data.likes } : s))
       return data

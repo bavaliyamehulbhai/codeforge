@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation, Link } from 'react-router-dom'
 import CodeMirror from '@uiw/react-codemirror'
 import { vscodeDark } from '@uiw/codemirror-theme-vscode'
@@ -8,6 +8,7 @@ import { cpp } from '@codemirror/lang-cpp'
 import { java } from '@codemirror/lang-java'
 import { rust } from '@codemirror/lang-rust'
 import { go } from '@codemirror/lang-go'
+import { autocompletion, startCompletion, completeFromList, completeAnyWord } from '@codemirror/autocomplete'
 import clsx from 'clsx'
 import { 
   Play, Save, Terminal as TerminalIcon, Loader2, 
@@ -26,7 +27,7 @@ import * as htmlToImage from 'html-to-image'
 import LanguagePicker from '@/components/LanguagePicker'
 import Tooltip from '@/components/Tooltip'
 import { formatCode } from '@/lib/formatter'
-import { EditorView } from '@codemirror/view'
+import { EditorView, keymap } from '@codemirror/view'
 import { useFocusAudio } from '@/hooks/useFocusAudio'
 import { useAPMTracker } from '@/hooks/useAPMTracker'
 import { BOILERPLATES } from '@/lib/boilerplates'
@@ -36,7 +37,7 @@ import styles from './Compiler.module.css'
 export default function Compiler() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const { saveSnippet, fetchSnippetById } = useSnippets()
+  const { saveSnippet, fetchSnippetById, incrementRunCount } = useSnippets()
   const { 
     code, setCode, stdin, setStdin, language, setLanguage, output, isRunning, runCode,
     fontSize, updateFontSize, theme, updateTheme, setOutput 
@@ -55,6 +56,8 @@ export default function Compiler() {
   const [isForging, setIsForging] = useState(false)
   const [isScanning, setIsScanning] = useState(false)
   const [showSnapshotModal, setShowSnapshotModal] = useState(false)
+  const [showRestoreModal, setShowRestoreModal] = useState(false)
+  const [restorePayload, setRestorePayload] = useState<{ code: string; language: string; title: string } | null>(null)
   
   // Advanced Features State
   const [codeHistory, setCodeHistory] = useState<string[]>([])
@@ -65,6 +68,19 @@ export default function Compiler() {
   const [showLibrary, setShowLibrary] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [wordWrap, setWordWrap] = useState(true)
+  const [isAutocompleteEnabled, setIsAutocompleteEnabled] = useState(() =>
+    localStorage.getItem('codeforge_autocomplete') !== 'false'
+  )
+    const toggleAutocomplete = () => {
+      setIsAutocompleteEnabled(prev => {
+        const next = !prev
+        localStorage.setItem('codeforge_autocomplete', String(next))
+        return next
+      })
+    }
+  const mainRef = useRef<HTMLDivElement | null>(null)
+  const [outputWidth, setOutputWidth] = useState(() => Number(localStorage.getItem('codeforge_output_width')) || 400)
+  const [isResizing, setIsResizing] = useState(false)
   
   // Phase 4 Gamification State
   const apm = useAPMTracker()
@@ -96,6 +112,88 @@ export default function Compiler() {
     const s = seconds % 60
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   }
+
+  const clampOutputWidth = (value: number) => {
+    const min = 260
+    if (!mainRef.current) return Math.max(min, value)
+    const rect = mainRef.current.getBoundingClientRect()
+    const max = Math.max(min, rect.width - 360)
+    return Math.min(max, Math.max(min, value))
+  }
+
+  const getCompletionSource = () => {
+    const keywordsByLang: Record<string, string[]> = {
+      javascript: [
+        'const', 'let', 'var', 'function', 'return', 'async', 'await', 'if', 'else',
+        'for', 'while', 'switch', 'case', 'try', 'catch', 'class', 'new', 'import',
+        'export', 'default', 'console', 'log', 'map', 'filter', 'reduce', 'Promise'
+      ],
+      python: [
+        'def', 'return', 'if', 'elif', 'else', 'for', 'while', 'try', 'except',
+        'class', 'import', 'from', 'as', 'with', 'lambda', 'print', 'range', 'len'
+      ],
+      cpp: [
+        '#include', 'using', 'namespace', 'std', 'int', 'long', 'double', 'string',
+        'vector', 'cout', 'cin', 'return', 'if', 'else', 'for', 'while', 'class'
+      ],
+      c: [
+        '#include', 'int', 'long', 'double', 'char', 'printf', 'scanf', 'return',
+        'if', 'else', 'for', 'while', 'struct'
+      ],
+      java: [
+        'public', 'class', 'static', 'void', 'main', 'String', 'new', 'return',
+        'if', 'else', 'for', 'while', 'try', 'catch', 'System', 'out', 'println'
+      ],
+      rust: [
+        'fn', 'let', 'mut', 'pub', 'impl', 'struct', 'enum', 'match', 'if', 'else',
+        'for', 'while', 'loop', 'use', 'crate', 'println!'
+      ],
+      go: [
+        'package', 'import', 'func', 'var', 'const', 'type', 'struct', 'interface',
+        'return', 'if', 'else', 'for', 'range', 'go', 'defer', 'fmt'
+      ]
+    }
+
+    const list = (keywordsByLang[language] || []).map((label) => ({ label, type: 'keyword' as const }))
+    return list.length ? completeFromList(list) : null
+  }
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing || !mainRef.current) return
+      const rect = mainRef.current.getBoundingClientRect()
+      const nextWidth = clampOutputWidth(rect.right - e.clientX)
+      setOutputWidth(nextWidth)
+    }
+
+    const handleMouseUp = () => {
+      if (!isResizing) return
+      setIsResizing(false)
+      localStorage.setItem('codeforge_output_width', String(outputWidth))
+    }
+
+    if (isResizing) {
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+      window.addEventListener('mousemove', handleMouseMove)
+      window.addEventListener('mouseup', handleMouseUp)
+    }
+
+    return () => {
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isResizing, outputWidth])
+
+  useEffect(() => {
+    const handleResize = () => {
+      setOutputWidth((prev) => clampOutputWidth(prev))
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Rubber Duck Chat Logic
   const handleDuckSubmit = (e: React.FormEvent) => {
@@ -138,6 +236,26 @@ export default function Compiler() {
     return () => clearInterval(interval)
   }, [])
 
+  const handleRun = useCallback(async () => {
+    const lang = LANGUAGES.find(l => l.value === language)
+    if (lang) {
+      toast(`Compiling ${lang.name}...`, 'info')
+      const result = await runCode(lang.id)
+      if (snippetId) {
+        incrementRunCount(snippetId)
+      }
+      // Save to history
+      if (result) {
+        setExecutionHistory(prev => [{
+          timestamp: new Date().toLocaleTimeString(),
+          language: lang.name,
+          status: (result as any).status?.description || 'Done',
+          output: (result as any).stdout || (result as any).stderr || 'No output'
+        }, ...prev].slice(0, 10))
+      }
+    }
+  }, [incrementRunCount, language, runCode, snippetId, toast])
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -147,12 +265,12 @@ export default function Compiler() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [code, language])
+  }, [handleRun])
 
   // Record Code History for Time-Travel
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (!code.trim()) return;
+      if (!code?.trim()) return;
       setCodeHistory(prev => {
         const lastRec = prev[prev.length - 1];
         if (code !== lastRec) {
@@ -190,10 +308,14 @@ export default function Compiler() {
 
     if (location.state?.snippet) {
       const { snippet } = location.state
-      setCode(snippet.code)
-      setLanguage(snippet.language)
+      const nextLanguage = snippet.language || language
+      const nextCode = (snippet.code || '').trim()
+        ? snippet.code
+        : (getDefaultCodeForLanguage(nextLanguage) || '')
+      setCode(nextCode)
+      setLanguage(nextLanguage)
       setTitle(snippet.title || 'Untitled Snippet')
-      setSnippetId(snippet.id)
+      setSnippetId(snippet.id || null)
       setHasPickedLanguage(true)
     } else if (id) {
       // Deep link or refresh - fetch the snippet
@@ -229,25 +351,11 @@ export default function Compiler() {
     }
   }
 
-  const handleRun = async () => {
-    const lang = LANGUAGES.find(l => l.value === language)
-    if (lang) {
-      toast(`Compiling ${lang.name}...`, 'info')
-      const result = await runCode(lang.id)
-      // Save to history
-      if (result) {
-        setExecutionHistory(prev => [{
-          timestamp: new Date().toLocaleTimeString(),
-          language: lang.name,
-          status: (result as any).status?.description || 'Done',
-          output: (result as any).stdout || (result as any).stderr || 'No output'
-        }, ...prev].slice(0, 10))
-      }
-    }
-  }
+  
 
   const handleSave = async () => {
     if (!user) return toast('Please sign in to save snippets', 'error')
+    if (!code?.trim()) return toast('Please enter some code before saving', 'error')
     setIsSaving(true)
     try {
       const savedSnippet = await saveSnippet({ title, language, code, is_public: true })
@@ -277,6 +385,13 @@ export default function Compiler() {
   const clearConsole = () => {
     setOutput(null)
     toast('Console cleared', 'info')
+  }
+
+  const getOutputText = () => {
+    if (!output) return ''
+    return [output.stdout, output.stderr, output.compile_output, output.message]
+      .filter(Boolean)
+      .join('\n')
   }
 
   const handleForge = () => {
@@ -342,20 +457,51 @@ export default function Compiler() {
     const saved = localStorage.getItem('codeforge_autosave')
     if (saved && !location.state?.snippet) {
       const { code: c, language: l, title: t } = JSON.parse(saved)
-      if (confirm('Restore unsaved work from your last session?')) {
-        setCode(c)
-        setLanguage(l)
-        setTitle(t)
-        setHasPickedLanguage(true)
-      }
-      localStorage.removeItem('codeforge_autosave')
+      setRestorePayload({ code: c, language: l, title: t })
+      setShowRestoreModal(true)
     }
   }, [])
 
-  const handleLanguagePick = (lang: string, defaultCode: string) => {
-    setLanguage(lang)
-    setCode(defaultCode)
+  const handleRestoreConfirm = () => {
+    if (!restorePayload) return
+    setCode(restorePayload.code || '')
+    setLanguage(restorePayload.language || language)
+    setTitle(restorePayload.title || 'Untitled Snippet')
     setHasPickedLanguage(true)
+    localStorage.removeItem('codeforge_autosave')
+    setRestorePayload(null)
+    setShowRestoreModal(false)
+  }
+
+  const handleRestoreDiscard = () => {
+    localStorage.removeItem('codeforge_autosave')
+    setRestorePayload(null)
+    setShowRestoreModal(false)
+  }
+
+  const getDefaultCodeForLanguage = (lang: string) => {
+    return LANGUAGES.find(l => l.value === lang)?.defaultCode || ''
+  }
+
+  const applyLanguageChange = (nextLanguage: string, options?: { forceDefault?: boolean }) => {
+    const nextDefault = getDefaultCodeForLanguage(nextLanguage)
+    const prevDefault = getDefaultCodeForLanguage(language)
+    const isBlank = !code?.trim() || code.trim() === '// Write your code here...'
+    const shouldSwap = options?.forceDefault || code === prevDefault || isBlank
+
+    setLanguage(nextLanguage)
+    if (shouldSwap && nextDefault) {
+      setCode(nextDefault)
+    }
+  }
+
+  const handleLanguagePick = (lang: string, _defaultCode: string) => {
+    applyLanguageChange(lang, { forceDefault: true })
+    setHasPickedLanguage(true)
+  }
+
+  const handleLanguageChange = (nextLanguage: string) => {
+    applyLanguageChange(nextLanguage, { forceDefault: true })
   }
 
   const captureSnapshot = async () => {
@@ -422,7 +568,7 @@ export default function Compiler() {
               )}
               <select 
                 value={language} 
-                onChange={(e) => setLanguage(e.target.value)}
+                onChange={(e) => handleLanguageChange(e.target.value)}
                 className={styles.select}
               >
                 {LANGUAGES.map(l => (
@@ -451,43 +597,6 @@ export default function Compiler() {
           <Tooltip content="Keyboard Shortcuts">
             <button onClick={() => setShowShortcuts(true)} className={styles.miniBtn}>
               <Keyboard size={18} />
-            </button>
-          </Tooltip>
-          <div className={styles.libraryContainer}>
-            <Tooltip content="Boilerplate Library">
-              <button onClick={() => setShowLibrary(!showLibrary)} className={clsx(styles.miniBtn, showLibrary && styles.activeMiniBtn)}>
-                <BookTemplate size={18} />
-              </button>
-            </Tooltip>
-            {showLibrary && (
-              <div className={styles.libraryDropdown}>
-                <div className={styles.libraryHeader}>Standard Library</div>
-                {BOILERPLATES[language]?.length > 0 ? (
-                  BOILERPLATES[language].map((bp, idx) => (
-                    <button 
-                      key={idx} 
-                      className={styles.libraryItem}
-                      onClick={() => {
-                        setCode(bp.code)
-                        setShowLibrary(false)
-                        toast(`${bp.name} injected!`, 'success')
-                      }}
-                    >
-                      {bp.name}
-                    </button>
-                  ))
-                ) : (
-                  <div className={styles.emptyLibrary}>No boilerplates for {language}</div>
-                )}
-              </div>
-            )}
-          </div>
-          <Tooltip content="Focus Flow Audio">
-            <button 
-              onClick={toggleFocusAudio} 
-              className={clsx(styles.miniBtn, isFocusAudioPlaying && styles.activePulseBtn)} 
-            >
-              <Headphones size={18} />
             </button>
           </Tooltip>
           <Tooltip content="Editor Settings">
@@ -553,13 +662,33 @@ export default function Compiler() {
         </div>
       </header>
 
-      <main className={clsx(styles.main, isFocusMode && styles.focusMode)}>
+      <main
+        ref={mainRef}
+        className={clsx(styles.main, isFocusMode && styles.focusMode)}
+        style={{ ['--output-width' as any]: `${outputWidth}px` }}
+      >
         <div className={clsx(styles.editorPane, apm > 80 && styles.overclock, isPomodoroActive && styles.deepWorkMode)}>
           <CodeMirror
             value={code}
             height="100%"
             theme={theme === 'one-dark' ? oneDark : vscodeDark}
-            extensions={[...getExtensions(), wordWrap ? EditorView.lineWrapping : []]}
+            extensions={[
+              ...getExtensions(),
+              wordWrap ? EditorView.lineWrapping : [],
+              isAutocompleteEnabled
+                ? autocompletion({
+                    activateOnTyping: true,
+                    override: [
+                      ...(getCompletionSource() ? [getCompletionSource()!] : []),
+                      completeAnyWord
+                    ]
+                  })
+                : [],
+              keymap.of([
+                { key: 'Ctrl-Space', run: startCompletion },
+                { key: 'Mod-Space', run: startCompletion }
+              ])
+            ]}
             onChange={(val) => setCode(val)}
             className={styles.editor}
             style={{ fontSize: `${fontSize}px` }}
@@ -623,6 +752,13 @@ export default function Compiler() {
             </div>
           </div>
         </div>
+
+        <div
+          className={clsx(styles.splitter, isResizing && styles.splitterActive)}
+          onMouseDown={() => setIsResizing(true)}
+          onDoubleClick={() => setOutputWidth(400)}
+          title="Drag to resize panels"
+        />
 
         {isAssistantOpen && (
           <aside className={styles.assistantPanel}>
@@ -783,7 +919,7 @@ export default function Compiler() {
               >
                 <Keyboard size={14} />
               </button>
-              <button onClick={() => copyToClipboard(output?.stdout || '')} disabled={!output} className={styles.actionBtn} title="Copy Output">
+              <button onClick={() => copyToClipboard(getOutputText())} disabled={!output} className={styles.actionBtn} title="Copy Output">
                 <Copy size={14} />
               </button>
               <button onClick={clearConsole} disabled={!output} className={styles.actionBtn} title="Clear Console">
@@ -824,6 +960,13 @@ export default function Compiler() {
           <div className={styles.outputContent}>
             {output ? (
               <div className={styles.result}>
+                <div className={clsx(
+                  styles.outputStatus,
+                  (output.stderr || output.compile_output) ? styles.statusError : styles.statusSuccess
+                )}>
+                  <span>Status</span>
+                  <strong>{output.status?.description || (output.stderr || output.compile_output ? 'Error' : 'Completed')}</strong>
+                </div>
                 {output.stdout && (
                   <div className={styles.stdout}>
                     {output.stdout.split('\n').map((line, i) => {
@@ -907,6 +1050,23 @@ export default function Compiler() {
         </div>
       )}
 
+      {/* Restore Autosave Modal */}
+      {showRestoreModal && (
+        <div className={styles.modalOverlay} onClick={handleRestoreDiscard}>
+          <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h3>Restore Session</h3>
+              <button onClick={handleRestoreDiscard}>×</button>
+            </div>
+            <p>We found unsaved work from your last session. Do you want to restore it?</p>
+            <div className={styles.restoreActions}>
+              <button onClick={handleRestoreDiscard} className={styles.restoreSecondary}>Discard</button>
+              <button onClick={handleRestoreConfirm} className={styles.restorePrimary}>Restore</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Advanced Settings Modal */}
       {showSettings && (
         <div className={styles.modalOverlay} onClick={() => setShowSettings(false)}>
@@ -936,6 +1096,54 @@ export default function Compiler() {
                   <input type="checkbox" checked={wordWrap} onChange={(e) => setWordWrap(e.target.checked)} />
                   <span className={styles.slider}></span>
                 </label>
+              </div>
+              <div className={styles.settingGroup}>
+                <label>Autocomplete</label>
+                <label className={styles.toggleSwitch}>
+                  <input type="checkbox" checked={isAutocompleteEnabled} onChange={toggleAutocomplete} />
+                  <span className={styles.slider}></span>
+                </label>
+              </div>
+              <div className={styles.settingGroup}>
+                <label>Focus Flow Audio</label>
+                <label className={styles.toggleSwitch}>
+                  <input type="checkbox" checked={isFocusAudioPlaying} onChange={() => toggleFocusAudio()} />
+                  <span className={styles.slider}></span>
+                </label>
+              </div>
+              <div className={styles.settingGroup}>
+                <label>Boilerplates</label>
+                <div className={styles.libraryContainer}>
+                  <button
+                    onClick={() => setShowLibrary(!showLibrary)}
+                    className={styles.librarySettingsBtn}
+                  >
+                    <BookTemplate size={16} />
+                    <span>Open Library</span>
+                  </button>
+                  {showLibrary && (
+                    <div className={styles.libraryDropdown}>
+                      <div className={styles.libraryHeader}>Standard Library</div>
+                      {BOILERPLATES[language]?.length > 0 ? (
+                        BOILERPLATES[language].map((bp, idx) => (
+                          <button 
+                            key={idx} 
+                            className={styles.libraryItem}
+                            onClick={() => {
+                              setCode(bp.code)
+                              setShowLibrary(false)
+                              toast(`${bp.name} injected!`, 'success')
+                            }}
+                          >
+                            {bp.name}
+                          </button>
+                        ))
+                      ) : (
+                        <div className={styles.emptyLibrary}>No boilerplates for {language}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             <div className={styles.modalFooter}>

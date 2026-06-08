@@ -1,26 +1,15 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-
-# Dependencies
 node_modules
-dist
-dist-ssr
-*.local
-
-# Environment
 .env
-.env.local
-.env.production
-.env.example
-
-# Editor
-.vscode/*
-!.vscode/extensions.json
+dist
+coverage
+*.log
 .idea
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+.DS_Store
+.vscode
+*.tsbuildinfo
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.next.txt
+.next

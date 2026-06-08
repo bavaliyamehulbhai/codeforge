@@ -5,7 +5,8 @@ import { useSnippets } from '@/hooks/useSnippets'
 import {
   Code2, Sparkles, Zap,
   Clock, Library, ChevronRight,
-  TrendingUp, Activity, Settings
+  TrendingUp, Activity, Settings,
+  Cpu, Share2, ShieldCheck
 } from 'lucide-react'
 import { LANGUAGES } from '@/lib/languages'
 import { TEMPLATES } from '@/lib/templates'
@@ -298,6 +299,45 @@ export default function Home() {
             </div>
           </div>
           <div className={styles.glowBlob} />
+        </div>
+      </section>
+
+      <section className={styles.capabilities}>
+        <div className={styles.capHeader}>
+          <span className={styles.capEyebrow}>Signal Core</span>
+          <h2>Build, run, and ship from a single canvas</h2>
+          <p>Zero setup. Instant compile. Share-ready outputs in seconds.</p>
+        </div>
+        <div className={styles.capGrid}>
+          <div className={styles.capCard}>
+            <div className={styles.capIcon}><Cpu size={20} /></div>
+            <h3 className={styles.capTitle}>Realtime Cloud Compile</h3>
+            <p className={styles.capText}>Run code in isolated containers with low-latency feedback and live metrics.</p>
+          </div>
+          <div className={styles.capCard}>
+            <div className={styles.capIcon}><Share2 size={20} /></div>
+            <h3 className={styles.capTitle}>Shareable Snippets</h3>
+            <p className={styles.capText}>Publish or fork in one click. Every run can become a public artifact.</p>
+          </div>
+          <div className={styles.capCard}>
+            <div className={styles.capIcon}><ShieldCheck size={20} /></div>
+            <h3 className={styles.capTitle}>Safe Execution</h3>
+            <p className={styles.capText}>Resource limits, sanitization, and isolated sandboxes keep code secure.</p>
+          </div>
+        </div>
+        <div className={styles.signalStrip}>
+          <div className={styles.signalItem}>
+            <span className={styles.signalLabel}>Latency</span>
+            <span className={styles.signalValue}>24ms</span>
+          </div>
+          <div className={styles.signalItem}>
+            <span className={styles.signalLabel}>Languages</span>
+            <span className={styles.signalValue}>8+</span>
+          </div>
+          <div className={styles.signalItem}>
+            <span className={styles.signalLabel}>Uptime</span>
+            <span className={styles.signalValue}>99.98%</span>
+          </div>
         </div>
       </section>
 

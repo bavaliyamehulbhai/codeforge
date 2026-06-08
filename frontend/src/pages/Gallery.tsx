@@ -51,8 +51,14 @@ export default function Gallery() {
     })
 
   const shareOnTwitter = (s: Snippet) => {
-    const url = `https://codeforge.netlify.app/share/${s.id}`
+    const url = `${window.location.origin}/share/${s.id}`
     window.open(`https://twitter.com/intent/tweet?text=Check out this ${s.language} snippet on CodeForge: ${s.title}&url=${encodeURIComponent(url)}`, '_blank')
+  }
+
+  const handleClearFilters = () => {
+    setSearch('')
+    setLanguage('all')
+    setActiveTab('trending')
   }
 
   return (
@@ -178,6 +184,10 @@ export default function Gallery() {
           </div>
           <h3>No snippets found</h3>
           <p>Try adjusting your search or filters to discover community creations.</p>
+          <div className={styles.emptyActions}>
+            <button onClick={handleClearFilters} className={styles.primaryAction}>Reset Filters</button>
+            <Link to="/compiler" className={styles.secondaryAction}>Create Snippet</Link>
+          </div>
         </div>
       )}
     </div>

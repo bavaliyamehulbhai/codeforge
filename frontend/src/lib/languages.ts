@@ -31,7 +31,7 @@ export const LANGUAGES = [
   },
   {
     id: 73, name: 'Rust', value: 'rust',
-    logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/rust/rust-plain.svg',
+    logo: '/assets/icons/rust.svg',
     color: '#ce422b', tagline: 'Memory-Safe · Systems · Fast',
     defaultCode: `fn main() {\n    println!("Hello, CodeForge! 🦀");\n\n    let nums = vec![1, 2, 3, 4, 5];\n    let squares: Vec<i32> = nums.iter().map(|n| n * n).collect();\n    println!("Squares: {:?}", squares);\n}`
   },

@@ -72,9 +72,10 @@
 
 /* Skip button */
 .skipBtn {
-  position: absolute;
-  top: -8px;
-  right: 0;
+  position: fixed;
+  top: 20px;
+  right: 24px;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 8px;

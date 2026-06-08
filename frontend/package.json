@@ -9,6 +9,7 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "^6.18.1",
     "@codemirror/lang-cpp": "^6.0.2",
     "@codemirror/lang-go": "^6.0.1",
     "@codemirror/lang-java": "^6.0.1",
