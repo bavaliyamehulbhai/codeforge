@@ -617,6 +617,62 @@
   box-shadow: 0 0 12px var(--accent-glow);
 }
 
+/* Responsive: collapse multi-pane layout into single column on small screens */
+@media (max-width: 900px) {
+  .header { padding: 0 12px; height: 56px; gap: 8px; }
+  .titleWrapper { max-width: 160px; }
+  .titleInput { font-size: 15px; }
+  .controls { display: none; }
+  .headerRight { gap: 6px; }
+  .btnText { display: none; }
+  .runBtn, .saveBtn { padding: 8px 10px; }
+
+  .main { grid-template-columns: 1fr; }
+  .assistantPanel, .outputPane, .splitter { display: none !important; }
+  .editorPane { min-width: 0; border-right: none; }
+}
+
+@media (max-width: 480px) {
+  .header { padding: 0 8px; height: 52px; }
+  .logoText { display: none; }
+  .titleWrapper { max-width: 120px; }
+}
+
+/* Mobile output toggle styles */
+.mobileOutputToggle {
+  display: none;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-bright);
+  color: var(--text-secondary);
+  margin-left: 8px;
+}
+
+@media (max-width: 900px) {
+  .mobileOutputToggle { display: flex; }
+}
+
+/* When toggled, show output pane as bottom sheet */
+.showMobileOutput .outputPane {
+  display: block !important;
+  position: fixed !important;
+  left: 8px !important;
+  right: 8px !important;
+  bottom: 12px !important;
+  height: 45% !important;
+  border-radius: 12px !important;
+  z-index: 1500 !important;
+  overflow: hidden !important;
+}
+
+.showMobileOutput .main { grid-template-columns: 1fr !important; }
+
+.showMobileOutput .assistantPanel { display: none !important; }
+
 /* ── History Slider ── */
 .historyControl {
   display: flex;

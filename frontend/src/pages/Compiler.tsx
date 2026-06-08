@@ -14,7 +14,7 @@ import {
   Play, Save, Terminal as TerminalIcon, Loader2, 
   Globe, Cpu, Clock, Trash2, Copy, AlignLeft, ChevronDown,
   Maximize2, Minimize2, Code2, Sparkles, History,
-  Headphones, BookTemplate, Settings as SettingsIcon,
+  BookTemplate, Settings as SettingsIcon,
   Flame, Timer, MessageSquare, Send, Keyboard
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
@@ -67,6 +67,7 @@ export default function Compiler() {
   const [showSettings, setShowSettings] = useState(false)
   const [showLibrary, setShowLibrary] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [mobileOutputOpen, setMobileOutputOpen] = useState(false)
   const [wordWrap, setWordWrap] = useState(true)
   const [isAutocompleteEnabled, setIsAutocompleteEnabled] = useState(() =>
     localStorage.getItem('codeforge_autocomplete') !== 'false'
@@ -527,7 +528,7 @@ export default function Compiler() {
   const currentLang = LANGUAGES.find(l => l.value === language)
 
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${mobileOutputOpen ? styles.showMobileOutput : ''}`}>
       {/* Language Picker Overlay */}
       {!hasPickedLanguage && (
         <LanguagePicker
@@ -658,6 +659,14 @@ export default function Compiler() {
           <button onClick={handleSave} disabled={isSaving} className={styles.saveBtn}>
             {isSaving ? <Loader2 className={styles.spin} size={18} /> : <Save size={18} />}
             <span className={styles.btnText}>Save</span>
+          </button>
+          {/* Mobile output toggle (visible on small screens) */}
+          <button
+            className={styles.mobileOutputToggle}
+            onClick={() => setMobileOutputOpen(v => !v)}
+            title="Toggle Console"
+          >
+            <TerminalIcon size={18} />
           </button>
         </div>
       </header>
