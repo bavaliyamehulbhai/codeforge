@@ -21,14 +21,6 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  const handleSignOut = async () => {
-    await signOut()
-    navigate('/')
-  }
-
-  // Hide Navbar on Compiler page for a full-screen IDE experience
-  if (location.pathname === '/compiler') return null
-
   useEffect(() => {
     if (!menuOpen) return
     const onKey = (e: KeyboardEvent) => {
@@ -46,6 +38,14 @@ export default function Navbar() {
     }, 0)
     return () => document.removeEventListener('keydown', onKey)
   }, [menuOpen])
+
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/')
+  }
+
+  // Hide Navbar on Compiler page for a full-screen IDE experience
+  if (location.pathname === '/compiler') return null
 
   return (
     <nav className={`${styles.nav} ${isScrolled ? styles.scrolled : ''}`}>
